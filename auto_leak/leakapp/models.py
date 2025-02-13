@@ -5,6 +5,23 @@ class User(models.Model):
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=255)
 
+class LeakAppMasterData(models.Model):
+    part_number = models.CharField(max_length=255)
+    greater_less = models.CharField(max_length=10, blank=True, null=True)
+    setpoint1 = models.IntegerField(default=18, blank=True, null=True)
+    value = models.FloatField(null=True, blank=True)
+    setpoint2 = models.IntegerField(default=70, blank=True, null=True)
+    timer1 = models.DurationField(default="00:00:15", blank=True, null=True)
+    timer2 = models.DurationField(default="00:00:15", blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.part_number} - {self.setpoint}"
+    
+    class Meta:
+        verbose_name = "Leak App Master Data"
+        verbose_name_plural = "Leak App Master Data"
+        db_table = "leakapp_masterdata"
+
 
 # class DateRecord(models.Model):
 #     dt = models.DateTimeField()

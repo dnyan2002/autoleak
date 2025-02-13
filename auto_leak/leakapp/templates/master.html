@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Master Data{% endblock %}
+
+{% block content %}
+    <div class="d-flex">
+        <h2>Master Data</h2>
+        
+    </div>
+    <br><br>
+    <div class="d-flex justify-content-center align-items-center vh-100">
+        <div class="card shadow-lg" style="width: 80%; max-width: 600px;">
+            <div class="card-body">
+                <form id="master_data_form" class="row g-2 align-items-center">
+                    <div class="col-auto position-relative">
+                        <input type="text" id="part_number" name="part_number" class="form-control" placeholder="Enter Part Number">
+                        <!-- Dropdown (example) -->
+                        <div id="dropdown-container" class="position-absolute top-100 start-0 w-100" style="z-index: 1050; max-height: 200px; overflow-y: auto; background-color: white;">
+                            <!-- Your dropdown content here -->
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" id="add_button" class="btn btn-success" disabled>Add</button>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" id="edit_button" class="btn btn-warning" disabled>Edit</button>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" id="delete_button" class="btn btn-danger" disabled>Delete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div id="search_results" class="mt-2" style="display: none; background: #f8f9fa; border: 1px solid #ccc; padding: 5px;"></div>
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            let selectedPartId = null;
+
+            $("#part_number").on("input", function () {
+                let query = $(this).val().trim();
+                if (query.length > 1) {
+                    $.ajax({
+                        url: "{% url 'leakapp_search' %}",
+                        data: { query: query },
+                        success: function (data) {
+                            let suggestions = "";
+                            data.results.forEach(function (item) {
+                                suggestions += `<div class="suggestion-item" style="cursor: pointer; padding: 8px;">${item.part_number}</div>`;
+                            });
+                            $("#dropdown-container").html(suggestions).show();
+
+                            // Check if part number already exists
+                            if (data.results.length > 0) {
+                                // Part exists
+                                selectedPartId = data.results[0].id; // Assuming you return the ID along with part_number
+                                $("#add_button").prop("disabled", true); // Disable Add button if part exists
+                                $("#edit_button, #delete_button").prop("disabled", false); // Enable Edit and Delete
+                            } else {
+                                // Part does not exist
+                                selectedPartId = null;
+                                $("#add_button").prop("disabled", false); // Enable Add button for new part
+                                $("#edit_button, #delete_button").prop("disabled", true); // Disable Edit and Delete
+                            }
+                        }
+                    });
+                } else {
+                    $("#dropdown-container").hide();
+                    // Disable buttons if input is too short
+                    $("#add_button").prop("disabled", true);
+                    $("#edit_button, #delete_button").prop("disabled", true);
+                }
+            });
+
+            // Handle clicking on a suggestion
+            $(document).on("click", ".suggestion-item", function () {
+                let selectedPartNumber = $(this).text();
+                $("#part_number").val(selectedPartNumber);
+                $("#add_button").prop("disabled", true); // Disable Add button after selecting a suggestion
+                $("#edit_button, #delete_button").prop("disabled", false);
+                $("#dropdown-container").hide();
+
+                // Get the ID based on the selected part number
+                $.ajax({
+                    url: "{% url 'leakapp_search' %}",
+                    data: { query: selectedPartNumber },
+                    success: function (data) {
+                        if (data.results.length > 0) {
+                            selectedPartId = data.results[0].id;  // Assuming you return the ID along with part_number
+                        }
+                    }
+                });
+            });
+            // Handle Delete Button Click
+            $("#delete_button").click(function (e) {
+                e.preventDefault();
+
+                if (!selectedPartId) {
+                    alert("Please select a valid part number to delete.");
+                    return;
+                }
+
+                if (!confirm("Are you sure you want to delete this record?")) {
+                    return;
+                }
+
+                $.ajax({
+                    type: "DELETE",
+                    url: "/leakapp/delete/" + selectedPartId + "/", // Send ID instead of part number
+                    headers: {
+                        "X-CSRFToken": "{{ csrf_token }}"
+                    },
+                    success: function (response) {
+                        alert("Record deleted successfully!");
+                        location.reload();
+                    },
+                    error: function (xhr) {
+                        alert("Error: " + xhr.responseText);
+                    }
+                });
+            });
+
+            // Handle Add Button Click
+            $("#add_button").click(function (e) {
+                e.preventDefault(); // Prevent form submission default behavior
+
+                let partNumber = $("#part_number").val().trim();
+                if (partNumber === "") {
+                    alert("Part number cannot be empty.");
+                    return;
+                }
+
+                $.ajax({
+                    type: "POST",
+                    url: "{% url 'leakapp_list' %}", // Ensure this is the correct URL for adding
+                    data: {
+                        part_number: partNumber,
+                        csrfmiddlewaretoken: "{{ csrf_token }}"
+                    },
+                    success: function (response) {
+                        alert("Record added successfully!");
+                        location.reload();
+                    },
+                    error: function (xhr) {
+                        alert("Error: " + xhr.responseText);
+                    }
+                });
+            });
+        });
+    </script>
+    <script>
+        function getCSRFToken() {
+            return document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+        }
+    </script>
+{% endblock %}
+
