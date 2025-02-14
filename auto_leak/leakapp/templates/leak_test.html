@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+<style>
+    .dropdown-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .dropdown-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%;
+        z-index: 2000 !important;
+    }
+
+    .button-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+</style>
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-3">Leak Test</h2>
+
+    <!-- Part Selection and Buttons -->
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="dropdown-container">
+            <input type="text" id="searchPartNumber" class="form-control" placeholder="Search or Select Part Number" autocomplete="off">
+            <ul id="dropdownList" class="dropdown-menu" style="display: none; max-height: 200px; overflow-y: auto; width: 100%;"></ul>
+        </div>
+
+        <div class="button-group">
+            <button class="btn btn-success me-2" id="start_button">FOI Start</button>
+            <button class="btn btn-danger" id="stop_button">FOI Stop</button>
+        </div>
+    </div>
+
+    <!-- Group 1: AI1 to AI8 -->
+    <div class="row">
+        {% for column in filter_names|slice:":8" %}
+        <div class="col-md-6">
+            <table class="table table-bordered">
+                <thead style="background-color: #062A63; color: #fff;">
+                    <tr>
+                        <th>Station No</th>
+                        <th>Leakage Value</th>
+                        <th>Highest Value</th>
+                        <th>Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for filter_no in filter_names|slice:":8" %}
+                        <tr>
+                            <td>{{ filter_no }}</td>
+                            <td>
+                                {{ filter_values|get_item:filter_no|default:"-" }}
+                            </td>
+                            <td>
+                                {{ highest_values|get_item:filter_no|default:"-" }}
+                            </td>
+                            <td>
+                                {{ results|get_item:filter_no|default:"-" }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Group 2: AI9 to AI16 -->
+    <div class="row">
+        {% for column in filter_names|slice:"8:" %}
+        <div class="col-md-6">
+            <table class="table table-bordered">
+                <thead style="background-color: #062A63; color: #fff;">
+                    <tr>
+                        <th>Filter No</th>
+                        <th>Filter Value</th>
+                        <th>Highest Value</th>
+                        <th>Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for filter_no in filter_names|slice:"8:" %}
+                        <tr>
+                            <td>{{ filter_no }}</td>
+                            <td>
+                                {{ filter_values|get_item:filter_no|default:"-" }}
+                            </td>
+                            <td>
+                                {{ highest_values|get_item:filter_no|default:"-" }}
+                            </td>
+                            <td>
+                                {{ results|get_item:filter_no|default:"-" }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+// Dropdown position logic
+document.addEventListener("DOMContentLoaded", function () {
+    const inputField = document.getElementById("searchPartNumber");
+    const dropdown = document.getElementById("dropdownList");
+
+    function positionDropdown() {
+        const rect = inputField.getBoundingClientRect();
+        dropdown.style.top = `${rect.bottom}px`;
+        dropdown.style.left = `${rect.left}px`;
+        dropdown.style.width = `${rect.width}px`;
+
+        if (dropdown.getBoundingClientRect().bottom > window.innerHeight) {
+            dropdown.style.top = `${rect.top - dropdown.offsetHeight}px`;
+        }
+    }
+
+    inputField.addEventListener("input", function () {
+        let filter = inputField.value.trim();
+
+        if (filter.length === 0) {
+            dropdown.style.display = "none";
+            return;
+        }
+
+        fetch(`/search-part-numbers/?query=${filter}`)
+            .then(response => response.json())
+            .then(data => {
+                dropdown.innerHTML = "";
+                if (data.results.length === 0) {
+                    dropdown.style.display = "none";
+                    return;
+                }
+
+                data.results.forEach(item => {
+                    let listItem = document.createElement("li");
+                    listItem.classList.add("dropdown-item");
+                    listItem.textContent = item.part_number;
+                    listItem.setAttribute("data-value", item.part_number);
+
+                    listItem.addEventListener("click", function () {
+                        inputField.value = this.getAttribute("data-value");
+                        dropdown.style.display = "none";
+                        inputField.blur();
+                    });
+
+                    dropdown.appendChild(listItem);
+                });
+
+                dropdown.style.display = "block";
+                positionDropdown();
+            });
+    });
+
+    document.addEventListener("click", function (event) {
+        if (!inputField.contains(event.target) && !dropdown.contains(event.target)) {
+            dropdown.style.display = "none";
+        }
+    });
+});
+</script>
+
+<script>
+let pollingInterval;
+let isPolling = false;
+
+document.getElementById("start_button").addEventListener("click", function () {
+    const partNumber = document.getElementById("searchPartNumber").value;
+
+    if (partNumber) {
+        pollingInterval = setInterval(function () {
+            fetch(`/get-latest-filter-values/?part_number=${partNumber}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateFilterValues(data.latest_filters);
+                });
+        }, 2000);
+        isPolling = true;
+    }
+});
+
+document.getElementById("stop_button").addEventListener("click", function () {
+    if (isPolling) {
+        clearInterval(pollingInterval);
+        isPolling = false;
+
+        const partNumber = document.getElementById("searchPartNumber").value;
+        fetch(`/get-highest-filter-value/?part_number=${partNumber}`)
+            .then(response => response.json())
+            .then(data => {
+                displayHighestValues(data.highest_values);
+            });
+    }
+});
+
+function updateFilterValues(latestFilters) {
+    Object.keys(latestFilters).forEach(filterName => {
+        const filterValue = latestFilters[filterName];
+        document.getElementById(`filter_value_${filterName}`).textContent = filterValue || "-";
+    });
+}
+
+function displayHighestValues(highestValues) {
+    Object.keys(highestValues).forEach(filterName => {
+        const highestValue = highestValues[filterName];
+        document.getElementById(`highest_value_${filterName}`).textContent = highestValue || "-";
+    });
+}
+</script>
+
+{% endblock %}

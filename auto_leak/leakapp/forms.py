@@ -1,7 +1,8 @@
 from django import forms
 from django.utils.timezone import now
 from django.core.exceptions import ValidationError
-from leakapp.models import LeakAppMasterData, User
+from leakapp.models import LeakAppMasterData, User, LeakAppTest
+
 
 class LoginForm(forms.Form):
     username = forms.CharField(
@@ -32,7 +33,14 @@ class LoginForm(forms.Form):
             raise forms.ValidationError('This username already exists. Please choose a different one.')
         return username
 
+
 class LeakAppMasterDataForm(forms.ModelForm):
     class Meta:
         model = LeakAppMasterData
+        fields = "__all__"
+
+
+class LeakAppTestForm(forms.ModelForm):
+    class Meta:
+        model = LeakAppTest
         fields = "__all__"

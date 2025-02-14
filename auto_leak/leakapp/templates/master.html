@@ -3,21 +3,20 @@
 {% block title %}Master Data{% endblock %}
 
 {% block content %}
-    <div class="d-flex">
-        <h2>Master Data</h2>
-        
-    </div>
-    <br><br>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 id="page_title">Add Master Data</h2>
+    <button type="button" id="toggle_button" class="btn" style="background-color: #062A63; color: #fff; transition: 0.3s ease; cursor: pointer; border: none; padding: 10px 20px;">List Master Data</button>
+</div>
+
+<!-- Master Data Form -->
+<div id="master_data_form_container">
     <div class="d-flex justify-content-center align-items-center vh-100">
         <div class="card shadow-lg" style="width: 80%; max-width: 600px;">
             <div class="card-body">
                 <form id="master_data_form" class="row g-2 align-items-center">
                     <div class="col-auto position-relative">
                         <input type="text" id="part_number" name="part_number" class="form-control" placeholder="Enter Part Number">
-                        <!-- Dropdown (example) -->
-                        <div id="dropdown-container" class="position-absolute top-100 start-0 w-100" style="z-index: 1050; max-height: 200px; overflow-y: auto; background-color: white;">
-                            <!-- Your dropdown content here -->
-                        </div>
+                        <div id="dropdown-container" class="position-absolute top-100 start-0 w-100" style="z-index: 1050; max-height: 200px; overflow-y: auto; background-color: white;"></div>
                     </div>
                     <div class="col-auto">
                         <button type="button" id="add_button" class="btn btn-success" disabled>Add</button>
@@ -32,9 +31,54 @@
             </div>
         </div>
     </div>
-    
-    <div id="search_results" class="mt-2" style="display: none; background: #f8f9fa; border: 1px solid #ccc; padding: 5px;"></div>
-    
+</div>
+
+<!-- List Master Data (Initially Hidden) -->
+<div id="list_view" style="display: none; height: 70vh; overflow-y: auto;">
+    <table class="table table-bordered mt-3">
+        <thead class="sticky-top" style="background-color: #062A63; color: #fff;">
+            <tr>
+                <th>Part Number</th>
+                <th>Greater/Less</th>
+                <th>Set Point 1</th>
+                <th>Set Point 2</th>
+                <th>Timer 1</th>
+                <th>Timer 2</th>
+            </tr>
+        </thead>
+        <tbody id="master_data_table_body">
+            {% for record in data %}
+            <tr>
+                <td>{{ record.part_number }}</td>
+                <td>{{ record.greater_less }}</td>
+                <td>{{ record.setpoint1 }}</td>
+                <td>{{ record.setpoint2 }}</td>
+                <td>{{ record.timer1 }}</td>
+                <td>{{ record.timer2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+    <script>
+        document.getElementById("toggle_button").addEventListener("click", function() {
+            var formContainer = document.getElementById("master_data_form_container");
+            var listView = document.getElementById("list_view");
+            var title = document.getElementById("page_title");
+            
+            if (formContainer.style.display === "none") {
+                formContainer.style.display = "block";
+                listView.style.display = "none";
+                this.textContent = "List Master Data";
+                title.textContent = "Master Data";
+            } else {
+                formContainer.style.display = "none";
+                listView.style.display = "block";
+                this.textContent = "Add Master Data";
+                title.textContent = "List Master Data";
+            }
+        });
+        </script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         $(document).ready(function () {
@@ -157,4 +201,3 @@
         }
     </script>
 {% endblock %}
-
