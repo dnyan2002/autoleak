@@ -378,12 +378,12 @@ body {
 
             
             
-            <div class="form-group" id="recipe-group">
+            <div class="form-group" id="part-group">
                 <label for="part_number">Part Number</label>
-                <select id="recipe_id" name="recipe_id">
+                <select id="part_number" name="part_number">
                     <option value="">Select Part Number</option>
                     {% for part in part_numbers %}
-                        <option value="{{ recipe.id }}" {% if recipe.id|stringformat:"s" == selected_recipe_id %} selected {% endif %}>
+                        <option value="{{ part_number.id }}" {% if part_number.id|stringformat:"s" == selected_part_number %} selected {% endif %}>
                             {{ part.part_number }}
                         </option>
                     {% endfor %}
@@ -420,7 +420,7 @@ body {
         <table class="data-table">    
             <thead>
                 <tr>
-                    <th>Part No</th>
+                    <th>Part Number</th>
                     <th>Highest Value</th>
                     <th>Station No</th>
                     <th>Status</th>
@@ -429,11 +429,11 @@ body {
                 </tr>
             </thead>
             <tbody>
-                {% for report in part_report %}
+                {% for report in report_data %}
                     <tr>
-                        <td>{{ report.part_no }}</td>
+                        <td>{{ report.part_number_id }}</td>
                         <td>{{ report.highest_value }}</td>
-                        <td>{{ report.station_no }}</td>
+                        <td>{{ report.filter_no }}</td>
                         <td>{{ report.status }}</td>
                         <td>{{ report.shift }}</td>
                         <td>{{ report.date }}</td>
@@ -482,7 +482,7 @@ body {
                 var formData = $('#filterForm').serialize();
                 $.ajax({
                     type: 'GET',
-                    url: '/Report_screen/',
+                    url: 'report',
                     data: formData,
                     success: function (data) {
                         $('#resultsTableBody').empty(); // Clear previous results
@@ -491,15 +491,15 @@ body {
                                 var newRow = "<tr>" +
                                     "<td>" + result.model_name + "</td>" +
                                     "<td>" + result.result + "</td>" +
-                                    "<td>" + result.Shift + "</td>" 
-                                    "<td>" + result.Date_Field + "</td>" +
+                                    "<td>" + result.shift + "</td>" 
+                                    "<td>" + result.date + "</td>" +
                                     "</tr>";
 
                                     var newRow = "<tr>" +
                                         "<td>" + result.model_name + "</td>" +
                                         "<td>" + result.result + "</td>" +
-                                        "<td>" + result.Shift + "</td>" +
-                                        "<td>" + result.Date_Field + "</td>" +
+                                        "<td>" + result.shift + "</td>" +
+                                        "<td>" + result.date + "</td>" +
                                         "</tr>";
 
                                 $('#resultsTableBody').append(newRow);
@@ -632,7 +632,7 @@ function exportToPDF() {
 
     // Define the headers for the PDF table
     const headers = [
-        ["Batch", "Recipe Name", "Batch Quantity", "Remark", "Status", "Required Time", "All Batch Time"]
+        ["Part Number", "Highest Value", "Station No", "Status", "Shift", "Date"]
     ];
 
     // Use autoTable to create the table in PDF
@@ -708,9 +708,9 @@ $('#filterButton').on('click', function () {
     let notOkCount = 0;
 
     data.forEach(result => {
-        if (result.result === 'ok') {
+        if (result.result === 'OK') {
             okCount++;
-        } else if (result.result === 'not ok') {
+        } else if (result.result === 'NOK') {
             notOkCount++;
         }
     });

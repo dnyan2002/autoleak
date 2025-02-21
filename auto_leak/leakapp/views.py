@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import authenticate,login,logout 
+from django.contrib.auth import authenticate, login, logout 
 from django.urls import reverse
 from django.views import View
 from django.db import connection
@@ -9,7 +9,7 @@ from datetime import datetime
 from django.http import JsonResponse
 from django.db.models import Max
 from leakapp.forms import LeakAppMasterDataForm, LeakAppTestForm
-from leakapp.models import LeakAppMasterData, LeakAppTest, LeakAppShowReport
+from leakapp.models import LeakAppMasterData, LeakAppTest, LeakAppShowReport, LeakAppResult, Shift
 # Create your views here.
 
 def user_login(request):
@@ -159,18 +159,20 @@ def report_screen(request):
     selected_date = request.GET.get("date", "")
     selected_month = request.GET.get("month", "")
     selected_year = request.GET.get("year", "")
-    selected_batch_counter = request.GET.get("batch_counter", "")
+    # selected_batch_counter = request.GET.get("batch_counter", "")
     selected_part_number = request.GET.get("part_number", "")
     selected_status = request.GET.get("status", "")
-
+    selected_shift = request.GET.get("shift", "")
     # Construct SQL Query
     sql_query = "SELECT * FROM leakapp_show_report WHERE 1=1"
     sql_params = []
+    print('Selected Part Number', selected_part_number)
+    from datetime import datetime
 
     if selected_date:
         try:
             selected_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
-            sql_query += " AND DATE(data) = %s"
+            sql_query += " AND DATE(date) = ?"
             sql_params.append(selected_date)
         except ValueError:
             pass
@@ -179,30 +181,35 @@ def report_screen(request):
         try:
             selected_month = int(selected_month)
             selected_year = int(selected_year)
-            sql_query += " AND YEAR(data) = %s AND MONTH(data) = %s"
-            sql_params.extend([selected_year, selected_month])
+            sql_query += " AND strftime('%Y', date) = ? AND strftime('%m', date) = ?"
+            sql_params.extend([str(selected_year), f"{selected_month:02d}"])  # Ensure month is zero-padded
         except ValueError:
             pass
 
     elif selected_year:
         try:
             selected_year = int(selected_year)
-            sql_query += " AND YEAR(data) = %s"
-            sql_params.append(selected_year)
+            sql_query += " AND strftime('%Y', date) = ?"
+            sql_params.append(str(selected_year))
         except ValueError:
             pass
 
     # Apply batch filter
-    if selected_batch_counter:
-        sql_query += " AND batch_counter = %s"
-        sql_params.append(selected_batch_counter)
+    if selected_shift:
+        shift = Shift.objects.get(shift_name=selected_shift)
+        print(shift)
+        sql_query += " AND shift_id = %s"
+        sql_params.append(shift.id)
 
     # Apply part number filter
     if selected_part_number:
+        print("it is in selected part")
         try:
-            part = LeakAppMasterData.objects.get(id=selected_part_number)
+            part = LeakAppMasterData.objects.get(part_number=selected_part_number)
+            print('Selected Part', part)
             sql_query += " AND part_number_id = %s"
             sql_params.append(part.id)
+            print(sql_params)
         except LeakAppMasterData.DoesNotExist:
             sql_query += " AND 1=0"  # Forces an empty result
 
@@ -218,10 +225,10 @@ def report_screen(request):
 
     # Get first record if only one result exists
     single_data = report_data[0] if len(report_data) == 1 else None
-
     # Populate dropdowns
     batch_counters = LeakAppShowReport.objects.values_list("batch_counter", flat=True).distinct()
     part_numbers = LeakAppMasterData.objects.all()
+    shifts = Shift.objects.all()
     statuses = LeakAppShowReport.objects.values_list("status", flat=True).distinct()
     years = list(range(2000, 2099))
 
@@ -232,13 +239,47 @@ def report_screen(request):
         "date": selected_date.strftime("%Y-%m-%d") if selected_date else "",
         "month": selected_month if selected_month else "",
         "year": selected_year if selected_year else "",
-        "selected_batch_counter": selected_batch_counter,
+        # "selected_batch_counter": selected_batch_counter,
         "selected_part_number": selected_part_number,
         "selected_status": selected_status,
         "batch_counters": batch_counters,
         "part_numbers": part_numbers,
         "statuses": statuses,
+        "shifts": shifts,
         "years": years,
     }
 
     return render(request, "report_screen.html", context)
+
+
+def get_latest_leak_data(request):
+    """Fetch latest leak test results for a selected part_number"""
+
+    part_number = request.GET.get("part_number", None)
+    if not part_number:
+        return JsonResponse({"error": "Part number is required"}, status=400)
+
+    # Get the latest data for AI1 to AI16 based on the latest date
+    latest_data = (
+        LeakAppResult.objects.filter(part_number=part_number)
+        .values("filter_no")
+        # .annotate(
+        #     latest_value=Max("filter_values"),
+        #     highest_value=Max("highest_value"),
+        #     latest_status=Max("status"),
+        #     latest_date=Max("date"),
+        # )
+        .order_by("filter_no")
+    )
+    if not latest_data:
+        return JsonResponse({"error": "No data found"}, status=404)
+
+    response_data = {
+        item["filter_no"]: {
+            "leakage_value": item["latest_value"],
+            "highest_value": item["highest_value"],
+            "status": item["latest_status"],
+        }
+        for item in latest_data
+    }
+    return JsonResponse({"latest_data": response_data})

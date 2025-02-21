@@ -39,10 +39,8 @@
             <button class="btn btn-danger" id="stop_button">FOI Stop</button>
         </div>
     </div>
-
-    <!-- Group 1: AI1 to AI8 -->
     <div class="row">
-        {% for column in filter_names|slice:":8" %}
+        <!-- Table 1: AI1 to AI8 -->
         <div class="col-md-6">
             <table class="table table-bordered">
                 <thead style="background-color: #062A63; color: #fff;">
@@ -55,59 +53,42 @@
                 </thead>
                 <tbody>
                     {% for filter_no in filter_names|slice:":8" %}
-                        <tr>
-                            <td>{{ filter_no }}</td>
-                            <td>
-                                {{ filter_values|get_item:filter_no|default:"-" }}
-                            </td>
-                            <td>
-                                {{ highest_values|get_item:filter_no|default:"-" }}
-                            </td>
-                            <td>
-                                {{ results|get_item:filter_no|default:"-" }}
-                            </td>
-                        </tr>
+                    <tr>
+                        <td>{{ filter_no }}</td>
+                        <td id="filter_value_{{ filter_no }}">{{ filter_values|get_item:filter_no|default:"-" }}</td>
+                        <td id="highest_value_{{ filter_no }}">{{ highest_values|get_item:filter_no|default:"-" }}</td>
+                        <td id="status_{{ filter_no }}">{{ results|get_item:filter_no|default:"-" }}</td>
+                    </tr>
                     {% endfor %}
-                </tbody>
+                </tbody>                
             </table>
         </div>
-        {% endfor %}
-    </div>
-
-    <!-- Group 2: AI9 to AI16 -->
-    <div class="row">
-        {% for column in filter_names|slice:"8:" %}
+    
+        <!-- Table 2: AI9 to AI16 -->
         <div class="col-md-6">
             <table class="table table-bordered">
                 <thead style="background-color: #062A63; color: #fff;">
                     <tr>
-                        <th>Filter No</th>
-                        <th>Filter Value</th>
+                        <th>Station No</th>
+                        <th>Leakage Value</th>
                         <th>Highest Value</th>
                         <th>Result</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for filter_no in filter_names|slice:"8:" %}
-                        <tr>
-                            <td>{{ filter_no }}</td>
-                            <td>
-                                {{ filter_values|get_item:filter_no|default:"-" }}
-                            </td>
-                            <td>
-                                {{ highest_values|get_item:filter_no|default:"-" }}
-                            </td>
-                            <td>
-                                {{ results|get_item:filter_no|default:"-" }}
-                            </td>
-                        </tr>
+                    {% for filter_no in filter_names|slice:":8" %}
+                    <tr>
+                        <td>{{ filter_no }}</td>
+                        <td id="filter_value_{{ filter_no }}">{{ filter_values|get_item:filter_no|default:"-" }}</td>
+                        <td id="highest_value_{{ filter_no }}">{{ highest_values|get_item:filter_no|default:"-" }}</td>
+                        <td id="status_{{ filter_no }}">{{ results|get_item:filter_no|default:"-" }}</td>
+                    </tr>
                     {% endfor %}
-                </tbody>
+                </tbody>                               
             </table>
         </div>
-        {% endfor %}
     </div>
-</div>
+    </div>
 
 <script>
 // Dropdown position logic
@@ -175,18 +156,32 @@ document.addEventListener("DOMContentLoaded", function () {
 let pollingInterval;
 let isPolling = false;
 
-document.getElementById("start_button").addEventListener("click", function () {
+function fetchLeakData() {
     const partNumber = document.getElementById("searchPartNumber").value;
+    
+    if (!partNumber) return;
 
-    if (partNumber) {
-        pollingInterval = setInterval(function () {
-            fetch(`/get-latest-filter-values/?part_number=${partNumber}`)
-                .then(response => response.json())
-                .then(data => {
-                    updateFilterValues(data.latest_filters);
-                });
-        }, 2000);
+    fetch(`/get-latest-leak-data/?part_number=${partNumber}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.warn(data.error);
+                return;
+            }
+            updateFilterTable(data.latest_data);
+        })
+        .catch(error => console.error("Error fetching leak data:", error));
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    // Fetch initial data on page load
+    fetchLeakData();
+});
+
+document.getElementById("start_button").addEventListener("click", function () {
+    if (!isPolling) {
         isPolling = true;
+        pollingInterval = setInterval(fetchLeakData, 2000);
     }
 });
 
@@ -194,27 +189,17 @@ document.getElementById("stop_button").addEventListener("click", function () {
     if (isPolling) {
         clearInterval(pollingInterval);
         isPolling = false;
-
-        const partNumber = document.getElementById("searchPartNumber").value;
-        fetch(`/get-highest-filter-value/?part_number=${partNumber}`)
-            .then(response => response.json())
-            .then(data => {
-                displayHighestValues(data.highest_values);
-            });
     }
 });
 
-function updateFilterValues(latestFilters) {
-    Object.keys(latestFilters).forEach(filterName => {
-        const filterValue = latestFilters[filterName];
-        document.getElementById(`filter_value_${filterName}`).textContent = filterValue || "-";
-    });
-}
-
-function displayHighestValues(highestValues) {
-    Object.keys(highestValues).forEach(filterName => {
-        const highestValue = highestValues[filterName];
-        document.getElementById(`highest_value_${filterName}`).textContent = highestValue || "-";
+function updateFilterTable(latestData) {
+    Object.keys(latestData).forEach(filterNo => {
+        document.getElementById(`filter_value_${filterNo}`).textContent =
+            latestData[filterNo].leakage_value || "-";
+        document.getElementById(`highest_value_${filterNo}`).textContent =
+            latestData[filterNo].highest_value || "-";
+        document.getElementById(`status_${filterNo}`).textContent =
+            latestData[filterNo].status || "-";
     });
 }
 </script>

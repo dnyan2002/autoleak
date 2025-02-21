@@ -145,7 +145,7 @@
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <ul class="navbar-nav mr-auto">
                 <li class="nav-item" id="plat">
-                    <a href="{% url 'leakapp_list' %}" class="nav-link {% if request.resolver_match.url_name == 'leakapp_list' %}active{% endif %}">Master</a>
+                    <a href="{% url 'leakapp_list' %}" class="nav-link {% if request.resolver_match.url_name == 'leakapp_list' %}active{% endif %}">Parts</a>
                 </li>
                 <li class="nav-item" id="plat">
                     <a href="{% url 'leak_test' %}" class="nav-link {% if request.resolver_match.url_name == 'leak_test' %}active{% endif %}">Leak Test</a>
@@ -153,12 +153,14 @@
                 <li class="nav-item" id="plat">
                     <a href="{% url 'report' %}" class="nav-link {% if request.resolver_match.url_name == 'report' %}active{% endif %}">Report</a>
                 </li>
-            </ul>            
+            </ul>
           <form class="form-inline my-2 my-lg-0">
+            <div></div>
             <div class="live-clock">    
                 <span id="date">DD/MM/YYYY</span>
                 <span id="clock">00:00:00</span>
             </div>
+            <a class="btn btn-outline-primary my-2 my-sm-0" href="{% url 'admin:index' %}" style="margin-left: 15px;">Admin Panel</a>
             <a class="btn btn-outline-success my-2 my-sm-0" href="{% url 'logout' %}" style="margin-left: 15px;">Logout</a> 
           </form>
         </div>

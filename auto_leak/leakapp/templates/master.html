@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Master Data{% endblock %}
+{% block title %}Parts{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 id="page_title">Add Master Data</h2>
-    <button type="button" id="toggle_button" class="btn" style="background-color: #062A63; color: #fff; transition: 0.3s ease; cursor: pointer; border: none; padding: 10px 20px;">List Master Data</button>
+    <h2 id="page_title">Add/Delete Part</h2>
+    <button type="button" id="toggle_button" class="btn" style="background-color: #062A63; color: #fff; transition: 0.3s ease; cursor: pointer; border: none; padding: 10px 20px;">List Parts</button>
 </div>
 
 <!-- Master Data Form -->
@@ -21,9 +21,9 @@
                     <div class="col-auto">
                         <button type="button" id="add_button" class="btn btn-success" disabled>Add</button>
                     </div>
-                    <div class="col-auto">
+                    <!-- <div class="col-auto">
                         <button type="button" id="edit_button" class="btn btn-warning" disabled>Edit</button>
-                    </div>
+                    </div> -->
                     <div class="col-auto">
                         <button type="button" id="delete_button" class="btn btn-danger" disabled>Delete</button>
                     </div>
@@ -69,13 +69,13 @@
             if (formContainer.style.display === "none") {
                 formContainer.style.display = "block";
                 listView.style.display = "none";
-                this.textContent = "List Master Data";
-                title.textContent = "Master Data";
+                this.textContent = "List Parts";
+                title.textContent = "Add/Delete Part";
             } else {
                 formContainer.style.display = "none";
                 listView.style.display = "block";
-                this.textContent = "Add Master Data";
-                title.textContent = "List Master Data";
+                this.textContent = "Add Part";
+                title.textContent = "List Parts";
             }
         });
         </script>

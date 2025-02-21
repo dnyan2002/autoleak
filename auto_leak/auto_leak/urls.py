@@ -2,8 +2,10 @@ from django.urls import path, include, re_path
 from leakapp import views
 from django.views.static import serve
 from django.conf import settings
+from django.contrib import admin
 
 urlpatterns = [
+    path('admin/', admin.site.urls),
     path('', views.user_login, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('leakapp/', views.LeakAppMasterDataView.as_view(), name='leakapp_list'),
@@ -15,6 +17,7 @@ urlpatterns = [
     path('get-latest-filter-values/', views.get_latest_filter_values, name='get_latest_filter_values'),
     path('get-highest-filter-value/', views.get_highest_filter_value, name='get_highest_filter_value'),
     path('report', views.report_screen, name='report'),
+    path('get-latest-leak-data/', views.get_latest_leak_data, name='get_latest_leak_data'),
     re_path(r'^media/(?P<path>.*)$',serve,{'document_root' : settings.MEDIA_ROOT}),
     re_path(r'^static/(?P<path>.*)$',serve,{'document_root' : settings.STATIC_ROOT}),
 ]
