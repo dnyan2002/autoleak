@@ -32,10 +32,10 @@ admin.site.register(FOI, FOIAdmin)
 
 class LeakAppTestAdmin(ImportExportModelAdmin):
     resource_class = LeakAppTestResource
-    list_display = ('part_number', 'batch_counter', 'filter_no', 'digital_input', 'filter_values', 'date_field', 'iot_value')
+    list_display = ('part_number', 'batch_counter', 'filter_no', 'filter_values', 'date', 'shift')
     search_fields = ('filter_no',)
-    list_filter = ('digital_input',)
-    ordering = ('-date_field',)
+    list_filter = ('batch_counter',)
+    ordering = ('-date',)
 
 admin.site.register(LeakAppTest, LeakAppTestAdmin)
 
@@ -60,7 +60,7 @@ admin.site.register(LeakAppShowReport, LeakAppShowReportAdmin)
 
 class LeakAppResultAdmin(ImportExportModelAdmin):
     resource_class = LeakAppResultResource
-    list_display = ('batch_counter', 'part_number', 'filter_no', 'filter_values', 'status', 'shift', 'highest_value', 'date', 'filter_counter_by_system', 'iot_value')
+    list_display = ('batch_counter', 'part_number', 'filter_no', 'filter_values', 'status', 'shift', 'date', 'filter_counter_by_system', 'iot_value')
     search_fields = ('filter_no', 'status')
     list_filter = ('status', 'shift')
     ordering = ('-date',)

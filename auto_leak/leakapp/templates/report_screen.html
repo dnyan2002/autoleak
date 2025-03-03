@@ -374,9 +374,7 @@ body {
                     <option value="{{ yr }}">{{ yr }}</option>
                     {% endfor %}
                 </select>
-            </div>
-
-            
+            </div>            
             
             <div class="form-group" id="part-group">
                 <label for="part_number">Part Number</label>
@@ -414,6 +412,32 @@ body {
                 <button onclick="exportToPDF()" class="pdf-button"><i class="fas fa-file-pdf"></i> Download PDF</button> <!-- New PDF button -->
             </div>
         </form>
+</div>
+<div class="report-container">
+    <!-- Left-side Pie Chart with OK/NOK Counts -->
+    <div class="left-section">
+        {% if chart %}
+            <img src="data:image/png;base64,{{ chart }}" alt="Status Pie Chart" class="large-pie-chart" />
+        {% else %}
+            <p>No data to display in pie chart.</p>
+        {% endif %}
+
+        <!-- OK and NOK Totals Below Pie Chart -->
+        <div class="totals-info">
+            <p>Total OK: {{ ok_count }}</p>
+            <p>Total NOK: {{ nok_count }}</p>
+        </div>
+
+        <!-- Legend for OK and NOK -->
+        <div class="legend">
+            <div class="legend-item">
+                <span class="legend-color ok-color"></span> OK
+            </div>
+            <div class="legend-item">
+                <span class="legend-color nok-color"></span> NOK
+            </div>
+        </div>
+    </div>
 </div>
     <!-- Display area for results -->
     <div id="resultsContainer">

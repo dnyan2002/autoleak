@@ -23,7 +23,7 @@ class LeakAppMasterData(models.Model):
 
     def __str__(self):
         return f"{self.part_number}"
-    
+
     class Meta:
         verbose_name = "Parts"
         verbose_name_plural = "Parts"
@@ -49,24 +49,24 @@ class FOI(models.Model):
         verbose_name_plural = "FOI"
 
 
-class LeakAppTest(models.Model):
-    part_number = models.ForeignKey(LeakAppMasterData, on_delete=models.CASCADE, verbose_name="Part Number")
-    batch_counter = models.IntegerField()
-    filter_no = models.CharField(max_length=50)
-    digital_input = models.CharField(max_length=20)
-    filter_values = models.FloatField()
-    date_field = models.DateTimeField(auto_now = True)
-    iot_value = models.FloatField()
-    class Meta:
-        db_table = "leakapp_test"
-        verbose_name = "Leak Test"
-        verbose_name_plural = "Leak Tests"
+# class LeakAppTest(models.Model):
+#     part_number = models.ForeignKey(LeakAppMasterData, on_delete=models.CASCADE, verbose_name="Part Number")
+#     batch_counter = models.IntegerField()
+#     filter_no = models.CharField(max_length=50)
+#     digital_input = models.CharField(max_length=20)
+#     filter_values = models.FloatField()
+#     date_field = models.DateTimeField(auto_now = True)
+#     iot_value = models.FloatField()
+#     class Meta:
+#         db_table = "leakapp_test"
+#         verbose_name = "Leak Test"
+#         verbose_name_plural = "Leak Tests"
 
 
 class Shift(models.Model):
     shift_name = models.CharField(max_length=50)
-    start_time = models.DurationField()
-    end_time = models.DurationField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
 
     def __str__(self):
         return self.shift_name
@@ -74,6 +74,22 @@ class Shift(models.Model):
         db_table = "shift_tbl"
         verbose_name = "Shift"
         verbose_name_plural = "Shifts"
+
+
+class LeakAppTest(models.Model):
+    batch_counter = models.IntegerField()
+    part_number = models.ForeignKey(LeakAppMasterData, on_delete= models.CASCADE)
+    filter_values = models.FloatField()
+    filter_no = models.CharField(max_length=50, verbose_name="Filter No")
+    status = models.CharField(max_length=30)
+    shift = models.ForeignKey(Shift, on_delete=models.CASCADE)
+    highest_value = models.FloatField()
+    date = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "leakapp_test"
+        verbose_name = "Leak Test"
+        verbose_name_plural = "Leak Tests"
 
 
 class LeakAppShowReport(models.Model):
@@ -99,10 +115,9 @@ class LeakAppResult(models.Model):
     filter_values = models.FloatField()
     status = models.CharField(max_length=30)
     shift = models.ForeignKey(Shift, on_delete=models.CASCADE)
-    highest_value = models.FloatField()
     date = models.DateTimeField(auto_now=True)
     filter_counter_by_system = models.IntegerField()
-    iot_value = models.IntegerField()
+    iot_value = models.IntegerField(null=True, blank=True)
 
     class Meta:
         db_table = "leakapp_result_tbl"

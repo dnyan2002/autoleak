@@ -14,6 +14,11 @@
         left: 0;
         width: 100%;
         z-index: 2000 !important;
+        background: white;
+        border: 1px solid #ddd;
+        max-height: 200px;
+        overflow-y: auto;
+        display: none;
     }
 
     .button-group {
@@ -21,26 +26,33 @@
         align-items: center;
         gap: 10px;
     }
+    .table-container {
+        max-height: 60vh;
+        overflow-y: auto;
+        padding-bottom: 100px;
+    }
+
 </style>
 
 {% block content %}
 <div class="container mt-4">
     <h2 class="mb-3">Leak Test</h2>
 
-    <!-- Part Selection and Buttons -->
+    <!-- Part Selection Input -->
     <div class="d-flex align-items-center justify-content-between mb-3">
         <div class="dropdown-container">
             <input type="text" id="searchPartNumber" class="form-control" placeholder="Search or Select Part Number" autocomplete="off">
-            <ul id="dropdownList" class="dropdown-menu" style="display: none; max-height: 200px; overflow-y: auto; width: 100%;"></ul>
+            <ul id="dropdownList" class="dropdown-menu"></ul>
         </div>
-
         <div class="button-group">
             <button class="btn btn-success me-2" id="start_button">FOI Start</button>
             <button class="btn btn-danger" id="stop_button">FOI Stop</button>
         </div>
     </div>
+
+    <!-- Leak Test Tables -->
+    <div class="table-container">
     <div class="row">
-        <!-- Table 1: AI1 to AI8 -->
         <div class="col-md-6">
             <table class="table table-bordered">
                 <thead style="background-color: #062A63; color: #fff;">
@@ -55,153 +67,213 @@
                     {% for filter_no in filter_names|slice:":8" %}
                     <tr>
                         <td>{{ filter_no }}</td>
-                        <td id="filter_value_{{ filter_no }}">{{ filter_values|get_item:filter_no|default:"-" }}</td>
-                        <td id="highest_value_{{ filter_no }}">{{ highest_values|get_item:filter_no|default:"-" }}</td>
-                        <td id="status_{{ filter_no }}">{{ results|get_item:filter_no|default:"-" }}</td>
+                        <td id="filter_value_{{ filter_no }}">-</td>
+                        <td id="highest_value_{{ filter_no }}">-</td>
+                        <td id="status_{{ filter_no }}">-</td>                        
                     </tr>
                     {% endfor %}
-                </tbody>                
+                </tbody>
             </table>
         </div>
-    
-        <!-- Table 2: AI9 to AI16 -->
-        <div class="col-md-6">
-            <table class="table table-bordered">
-                <thead style="background-color: #062A63; color: #fff;">
-                    <tr>
-                        <th>Station No</th>
-                        <th>Leakage Value</th>
-                        <th>Highest Value</th>
-                        <th>Result</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for filter_no in filter_names|slice:":8" %}
-                    <tr>
-                        <td>{{ filter_no }}</td>
-                        <td id="filter_value_{{ filter_no }}">{{ filter_values|get_item:filter_no|default:"-" }}</td>
-                        <td id="highest_value_{{ filter_no }}">{{ highest_values|get_item:filter_no|default:"-" }}</td>
-                        <td id="status_{{ filter_no }}">{{ results|get_item:filter_no|default:"-" }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>                               
-            </table>
-        </div>
-    </div>
-    </div>
 
+        <div class="col-md-6">
+            <table class="table table-bordered">
+                <thead style="background-color: #062A63; color: #fff;">
+                    <tr>
+                        <th>Station No</th>
+                        <th>Leakage Value</th>
+                        <th>Highest Value</th>
+                        <th>Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for filter_no in filter_names|slice:"8:" %}
+                    <tr>
+                        <td>{{ filter_no }}</td>
+                        <td id="filter_value_{{ filter_no }}">-</td>
+                        <td id="highest_value_{{ filter_no }}">-</td>
+                        <td id="status_{{ filter_no }}">-</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+  </div>
+</div>
 <script>
-// Dropdown position logic
-document.addEventListener("DOMContentLoaded", function () {
-    const inputField = document.getElementById("searchPartNumber");
-    const dropdown = document.getElementById("dropdownList");
+    document.addEventListener("DOMContentLoaded", function () {
+        const inputField = document.getElementById("searchPartNumber");
+        const dropdown = document.getElementById("dropdownList");
+        let selectedPartNumber = null;
 
-    function positionDropdown() {
-        const rect = inputField.getBoundingClientRect();
-        dropdown.style.top = `${rect.bottom}px`;
-        dropdown.style.left = `${rect.left}px`;
-        dropdown.style.width = `${rect.width}px`;
-
-        if (dropdown.getBoundingClientRect().bottom > window.innerHeight) {
-            dropdown.style.top = `${rect.top - dropdown.offsetHeight}px`;
-        }
-    }
-
-    inputField.addEventListener("input", function () {
-        let filter = inputField.value.trim();
-
-        if (filter.length === 0) {
-            dropdown.style.display = "none";
-            return;
+        function fetchLeakData(partNumber) {
+            if (!partNumber) return;
+            
+            fetch(`/leak-test/?part_number=${partNumber}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.warn(data.error);
+                        return;
+                    }
+                    updateFilterTable(data.latest_data);
+                })
+                .catch(error => console.error("Error fetching leak data:", error));
         }
 
-        fetch(`/search-part-numbers/?query=${filter}`)
-            .then(response => response.json())
-            .then(data => {
-                dropdown.innerHTML = "";
-                if (data.results.length === 0) {
-                    dropdown.style.display = "none";
-                    return;
+        function updateFilterTable(latestData) {
+            Object.keys(latestData).forEach(filterNo => {
+                document.getElementById(`filter_value_${filterNo}`).textContent = latestData[filterNo].leakage_value || "-";
+                document.getElementById(`highest_value_${filterNo}`).textContent = latestData[filterNo].highest_value || "-";
+                document.getElementById(`status_${filterNo}`).textContent = latestData[filterNo].status || "-";
+
+                let statusElement = document.getElementById(`status_${filterNo}`);
+
+                if (latestData[filterNo].status === "OK") {
+                    statusElement.style.color = "green";
+                    statusElement.style.fontWeight = "bold";
+                } else if (latestData[filterNo].status === "NOK") {
+                    statusElement.style.color = "red";
+                    statusElement.style.fontWeight = "bold";
+                } else {
+                    statusElement.style.color = "black";  // Default color
+                    statusElement.style.fontWeight = "normal";
                 }
-
-                data.results.forEach(item => {
-                    let listItem = document.createElement("li");
-                    listItem.classList.add("dropdown-item");
-                    listItem.textContent = item.part_number;
-                    listItem.setAttribute("data-value", item.part_number);
-
-                    listItem.addEventListener("click", function () {
-                        inputField.value = this.getAttribute("data-value");
-                        dropdown.style.display = "none";
-                        inputField.blur();
-                    });
-
-                    dropdown.appendChild(listItem);
-                });
-
-                dropdown.style.display = "block";
-                positionDropdown();
-            });
-    });
-
-    document.addEventListener("click", function (event) {
-        if (!inputField.contains(event.target) && !dropdown.contains(event.target)) {
-            dropdown.style.display = "none";
+        });
         }
-    });
-});
-</script>
 
-<script>
-let pollingInterval;
-let isPolling = false;
+        function positionDropdown() {
+            const rect = inputField.getBoundingClientRect();
+            dropdown.style.position = "absolute";
+            dropdown.style.top = `${window.scrollY + rect.bottom}px`;
+            dropdown.style.left = `${window.scrollX + rect.left}px`;
+            dropdown.style.width = `${rect.width}px`;
 
-function fetchLeakData() {
-    const partNumber = document.getElementById("searchPartNumber").value;
-    
-    if (!partNumber) return;
+            // If the dropdown goes off the screen, position it above the input field
+            if (rect.bottom + dropdown.offsetHeight > window.innerHeight) {
+                dropdown.style.top = `${window.scrollY + rect.top - dropdown.offsetHeight}px`;
+            }
+        }
 
-    fetch(`/get-latest-leak-data/?part_number=${partNumber}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                console.warn(data.error);
+        function startAutoRefresh() {
+            setInterval(function () {
+                if (selectedPartNumber) {
+                    fetchLeakData(selectedPartNumber);
+                }
+            }, 3000);  // Fetch data every 3 seconds
+        }
+
+        inputField.addEventListener("input", function () {
+            let query = inputField.value.trim();
+            
+            if (query.length === 0) {
+                dropdown.style.display = "none";
                 return;
             }
-            updateFilterTable(data.latest_data);
-        })
-        .catch(error => console.error("Error fetching leak data:", error));
-}
 
-document.addEventListener("DOMContentLoaded", function () {
-    // Fetch initial data on page load
-    fetchLeakData();
-});
+            fetch(`/search-part-numbers/?query=${query}`)
+                .then(response => response.json())
+                .then(data => {
+                    dropdown.innerHTML = "";
+                    if (data.results.length === 0) {
+                        dropdown.style.display = "none";
+                        return;
+                    }
 
-document.getElementById("start_button").addEventListener("click", function () {
-    if (!isPolling) {
-        isPolling = true;
-        pollingInterval = setInterval(fetchLeakData, 2000);
-    }
-});
+                    data.results.forEach(item => {
+                        let listItem = document.createElement("li");
+                        listItem.classList.add("dropdown-item");
+                        listItem.textContent = item.part_number;
+                        listItem.setAttribute("data-value", item.part_number);
 
-document.getElementById("stop_button").addEventListener("click", function () {
-    if (isPolling) {
-        clearInterval(pollingInterval);
-        isPolling = false;
-    }
-});
+                        listItem.addEventListener("click", function () {
+                            inputField.value = this.getAttribute("data-value");
+                            dropdown.style.display = "none";
+                            inputField.blur();
+                            selectedPartNumber = inputField.value;  // Store selected part number
+                            fetchLeakData(selectedPartNumber);
+                        });
 
-function updateFilterTable(latestData) {
-    Object.keys(latestData).forEach(filterNo => {
-        document.getElementById(`filter_value_${filterNo}`).textContent =
-            latestData[filterNo].leakage_value || "-";
-        document.getElementById(`highest_value_${filterNo}`).textContent =
-            latestData[filterNo].highest_value || "-";
-        document.getElementById(`status_${filterNo}`).textContent =
-            latestData[filterNo].status || "-";
+                        dropdown.appendChild(listItem);
+                    });
+
+                    dropdown.style.display = "block";
+                    positionDropdown();  // Reposition dropdown dynamically
+                });
+        });
+
+        document.addEventListener("click", function (event) {
+            if (!inputField.contains(event.target) && !dropdown.contains(event.target)) {
+                dropdown.style.display = "none";
+            }
+        });
+
+        window.addEventListener("resize", positionDropdown); // Adjust on window resize
+        window.addEventListener("scroll", positionDropdown); // Adjust on window scroll
+
+        startAutoRefresh();
     });
+</script>
+<script>
+document.getElementById("start_button").addEventListener("click", function () {
+    let selectedPartNumber = document.getElementById("searchPartNumber").value.trim();
+    if (!selectedPartNumber) {
+        alert("Please select a part number before starting.");
+        return;
+    }
+
+    let dataToSend = [];
+    
+    document.querySelectorAll("tbody tr").forEach(row => {
+        let filterNo = row.cells[0].textContent.trim();
+        let leakageValue = row.cells[1].textContent.trim();
+        let highestValue = row.cells[2].textContent.trim();
+        let statusText = row.cells[3].textContent.trim();
+
+        // Check if values are valid (i.e., not "-")
+        if (leakageValue !== "-" && highestValue !== "-" && statusText !== "-") {
+            dataToSend.push({
+                filter_no: filterNo,
+                leakage_value: parseFloat(leakageValue),
+                highest_value: parseFloat(highestValue),
+                status: statusText
+            });
+        }
+    });
+
+    if (dataToSend.length === 0) {
+        alert("No valid data found to store.");
+        return;
+    }
+
+    fetch("/save-leak-test-data/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken(),  // Ensure CSRF token is included
+        },
+        body: JSON.stringify({
+            part_number: selectedPartNumber,
+            leak_data: dataToSend
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert("Data saved successfully!");
+        } else {
+            alert("Error saving data.");
+        }
+    })
+    .catch(error => console.error("Error:", error));
+});
+
+// Function to get CSRF token
+function getCSRFToken() {
+    return document.cookie.split("; ")
+        .find(row => row.startsWith("csrftoken="))
+        ?.split("=")[1];
 }
 </script>
-
 {% endblock %}

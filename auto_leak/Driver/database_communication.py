@@ -1,7 +1,6 @@
 import mysql.connector
 from mysql.connector import Error
 import logging
-import socket
 import time
 
 # Configure logging
@@ -16,6 +15,8 @@ class DatabaseCommunication:
             "password": "",
             "database": "leak_app"
         }
+        self.connection = None
+        self.cursor = None
         self.connect_db()
 
     def connect_db(self):
@@ -31,52 +32,31 @@ class DatabaseCommunication:
 
     def reconnect(self):
         """Reconnects to the database in case of failure."""
-        logging.info("🔄 Reconnecting to the database...")
+        logging.info("🔄 Attempting to reconnect to the database...")
+        self.close_connection()
         self.connect_db()
 
     def insert_data(self, part_number, filter_no, filter_values, status):
-        """Check if data exists and insert sensor data into the database."""
-        if not self.connection:
+        """Inserts sensor data into the database."""
+        if not self.connection or not self.cursor:
             self.reconnect()
-        
+            if not self.connection:
+                logging.error("❌ Unable to reconnect to the database. Data will be lost.")
+                return
+
         try:
             insert_query = """
-            INSERT INTO leakapp_result_tbl 
-            (part_number_id, filter_no, filter_values, status) 
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO leak_app_result 
+            (part_number_id, filter_no, filter_values, status, date, iot_value) 
+            VALUES (%s, %s, %s, %s, NOW(), %s)
             """
-            self.cursor.execute(insert_query, (part_number, filter_no, filter_values, status))
+            self.cursor.execute(insert_query, (part_number, filter_no, filter_values, status, filter_values))
             self.connection.commit()
-            logging.info("✅ Data inserted successfully.")
-        
+            logging.info(f"✅ Data inserted: {filter_no} = {filter_values}, Status: {status}")
+
         except Error as e:
             logging.error(f"❌ Database error: {e}")
-
-    
-    def fetch_data_from_device(self, host, port, retries=3):
-        """Connects to an IoT device and retrieves data with retry logic."""
-        for attempt in range(retries):
-            try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.settimeout(5)
-                    s.connect((host, port))
-                    s.sendall(b'GET_DATA')
-                    data = s.recv(1024).decode('utf-8')
-                    logging.info(f"Received data: {data}")
-                    return data
-            except (socket.timeout, ConnectionRefusedError) as e:
-                logging.warning(f"Attempt {attempt+1}: Connection failed - {e}")
-                time.sleep(2)
-        logging.error("Failed to retrieve data after multiple attempts.")
-        return None
-
-    def main(self):
-        """Main function to fetch data and insert into the database."""
-        while True:
-            sensor_data = self.fetch_data_from_device('192.168.1.12', 5050)
-            if sensor_data is not None:
-                self.insert_data(sensor_data)
-            time.sleep(10)
+            self.reconnect()  # Try reconnecting if insertion fails
 
     def close_connection(self):
         """Closes the database connection properly."""
@@ -88,4 +68,3 @@ class DatabaseCommunication:
 
 if __name__ == "__main__":
     db = DatabaseCommunication()
-    db.main()
