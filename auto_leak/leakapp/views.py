@@ -1,6 +1,8 @@
 import io
+import json
 import base64
 from django.contrib import messages
+from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout 
 from django.urls import reverse
@@ -12,7 +14,7 @@ from matplotlib import pyplot as plt
 from django.http import JsonResponse
 from django.db.models import Max
 from leakapp.forms import LeakAppMasterDataForm, LeakAppTestForm
-from leakapp.models import LeakAppMasterData, LeakAppTest, LeakAppShowReport, LeakAppResult, Shift
+from leakapp.models import LeakAppMasterData, LeakAppTest, LeakAppShowReport, LeakAppResult, Shift, FOI, myplclog
 # Create your views here.
 
 def user_login(request):
@@ -255,11 +257,6 @@ def report_screen(request):
     }
     return render(request, "report_screen.html", context)
 
-
-from django.views.decorators.csrf import csrf_exempt
-import json
-from .models import LeakAppTest, LeakAppMasterData, Shift, FOI
-
 @csrf_exempt
 @login_required(login_url="login")
 def store_leak_test_data(request):
@@ -300,3 +297,51 @@ def store_leak_test_data(request):
             return JsonResponse({"success": False, "error": str(e)}, status=500)
 
     return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+
+@csrf_exempt
+def update_prodstatus(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        part_number = data.get('part_number')
+        prodstatus = data.get('prodstatus')
+
+        # Check if the part_number exists in LeakAppMasterData
+        try:
+            leak_data = LeakAppMasterData.objects.get(part_number=part_number)
+        except LeakAppMasterData.DoesNotExist:
+            return JsonResponse({"success": False, "error": "Part number not found."}, status=404)
+
+        # Get the existing plc_log entry with id=1, or create it if not present
+        plc_log_entry, created = myplclog.objects.get_or_create(id=1)
+
+        # Update the prodstatus field without changing part_number
+        plc_log_entry.prodstatus = prodstatus
+        plc_log_entry.save()
+
+        return JsonResponse({"success": True})
+
+    return JsonResponse({"success": False, "error": "Invalid request method."}, status=400)
+
+
+@csrf_exempt
+def update_part_log(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        part_number = data.get('part_number')
+
+        # Check if the part_number exists in LeakAppMasterData
+        try:
+            leak_data = LeakAppMasterData.objects.get(part_number=part_number)
+        except LeakAppMasterData.DoesNotExist:
+            return JsonResponse({"success": False, "error": "Part number not found."}, status=404)
+
+        # Get the existing plc_log entry with id=1, or create it if not present
+        plc_log_entry, created = myplclog.objects.get_or_create(id=1)
+
+        # Update the part_number field in the record
+        plc_log_entry.part_number = leak_data
+        plc_log_entry.save()
+
+        return JsonResponse({"success": True})
+
+    return JsonResponse({"success": False, "error": "Invalid request method."}, status=400)

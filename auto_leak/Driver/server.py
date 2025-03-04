@@ -1,84 +1,65 @@
 import socket
-import threading
-import logging
 import json
-import binascii
+import time
+import random
+import threading
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+# Simulate the IoT device sending data
+def create_test_data(device_id):
+    """Simulate IoT device data with random values for each filter."""
+    data = {
+        f"AI{i}": round(random.uniform(10.0, 100.0), 2)  # Random float between 10.0 and 100.0
+        for i in range(1 + (device_id - 1) * 8, 9 + (device_id - 1) * 8)  # Creates 8 filters per device
+    }
+    return data
 
-class IoTServer:
-    def __init__(self, port):
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind(("0.0.0.0", port))
-        self.server_socket.listen(5)
-        logging.info(f"✅ Server started, listening on port {port}...")
-
-    def handle_client(self, client_socket, address):
-        """Handles an incoming connection from an IoT device."""
-        logging.info(f"🔌 Connected to {address}")
-
+def send_data(device_id, host='127.0.0.1', port=9090):
+    """Simulate an IoT device sending data to the GreetingServer."""
+    while True:
         try:
-            received_data = b""
-            while True:
-                data = client_socket.recv(1024)  # Receive raw data
-                if not data:
-                    logging.warning("⚠️ No data received, closing connection.")
-                    break
+            # Create a socket object
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.connect((host, port))
+            print(f"✅ Connected to the server at {host}:{port} (Device {device_id})")
 
-                received_data += data  # Accumulate data
-                logging.info(f"📩 Received raw data (hex) from {address}: {received_data.hex()}")
+            # Set socket timeout to avoid indefinite blocking
+            client_socket.settimeout(5)
 
-            if not received_data:
-                return
+            # Keep sending data continuously (150 sets in 15 seconds)
+            for _ in range(150):  # 150 data points
+                # Simulate the IoT device sending random data
+                data = create_test_data(device_id)
+                json_data = json.dumps(data)  # Convert the data to JSON format
+                print(f"📤 Sending data from Device {device_id}: {json_data}")
+                
+                # Send the data
+                client_socket.sendall(json_data.encode())
 
-            try:
-                # Decode received data
-                decoded_data = received_data.decode().strip()
-                logging.debug(f"📩 Decoded string data: {decoded_data}")
+                # Wait for server's acknowledgment (optional)
+                try:
+                    response = client_socket.recv(1024)
+                    print(f"📥 Server response: {response.decode()}")
+                except socket.timeout:
+                    # No response from server, continue sending data
+                    print("⚠️ No response from server, continuing...")
 
-                # Check if the data is hex-encoded JSON
-                if all(c in "0123456789abcdefABCDEF" for c in decoded_data):
-                    try:
-                        decoded_data = binascii.unhexlify(decoded_data).decode()
-                        logging.info(f"🔄 Converted hex data to JSON: {decoded_data}")
-                    except Exception as e:
-                        logging.error(f"❌ Failed to convert hex to JSON: {e}")
-                        return
-
-                # Parse JSON
-                json_data = json.loads(decoded_data)
-                logging.info(f"✅ Parsed JSON data: {json_data}")
-
-                # Print JSON data on the console
-                for key, value in json_data.items():
-                    print(f"{key}: {value}")
-
-                # Send acknowledgment
-                client_socket.sendall(b"ACK")
-
-            except json.JSONDecodeError:
-                logging.error("❌ Invalid JSON format received!")
-                client_socket.sendall(b"Invalid JSON format")
+                # Wait 0.1 second to send 10 sets per second (150 sets in 15 seconds)
+                time.sleep(0.1)
 
         except Exception as e:
-            logging.error(f"❌ Error receiving data: {e}")
+            print(f"❌ Error occurred: {e}")
+            print("🔄 Reconnecting to the server...")
+            time.sleep(5)  # Wait before reconnecting if an error occurs
+            continue  # Retry connecting to the server
+
         finally:
             client_socket.close()
-            logging.info("🔌 Connection closed.")
+            print(f"🔌 Connection closed for Device {device_id}. Retrying...")
 
-    def run(self):
-        """Starts the server and listens for incoming connections."""
-        try:
-            while True:
-                client_socket, address = self.server_socket.accept()
-                threading.Thread(target=self.handle_client, args=(client_socket, address)).start()
-        except KeyboardInterrupt:
-            logging.info("🛑 Server shutting down...")
-        finally:
-            self.server_socket.close()
-
-# Start server
+# Start sending data from both devices
 if __name__ == "__main__":
-    server = IoTServer(port=9090)
-    server.run()
+    time.sleep(2)  # Ensure the server is up before the client starts
+    # Device 1
+    threading.Thread(target=send_data, args=(1,)).start()
+    # Device 2
+    threading.Thread(target=send_data, args=(2,)).start()

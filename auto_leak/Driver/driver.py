@@ -18,13 +18,13 @@ class MainSocketService:
         
         self.db_com = DatabaseCommunication()
         self.port1 = 9090
-        # self.port2 = 9090
+        self.port2 = 5050
 
         self.server1 = GreetingServer(self.port1)
-        # self.server2 = GreetingServer(self.port2)
+        self.server2 = GreetingServer(self.port2)
 
         self.thread1 = threading.Thread(target=self.server1.run, daemon=True)
-        # self.thread2 = threading.Thread(target=self.server2.run, daemon=True)
+        self.thread2 = threading.Thread(target=self.server2.run, daemon=True)
         self.running = True
         logging.info("✅ MainSocketService initialized.")
 
@@ -34,7 +34,7 @@ class MainSocketService:
         self.running = False
         
         self.server1.stop()
-        # self.server2.stop()
+        self.server2.stop()
         logging.info("✅ Services stopped. Exiting...")
 
     def run(self):
@@ -43,7 +43,7 @@ class MainSocketService:
         
         try:
             self.thread1.start()
-            # self.thread2.start()
+            self.thread2.start()
         except Exception as e:
             logging.error(f"❌ Error starting threads: {str(e)}", exc_info=True)
             return

@@ -103,177 +103,182 @@
 </div>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        const inputField = document.getElementById("searchPartNumber");
-        const dropdown = document.getElementById("dropdownList");
-        let selectedPartNumber = null;
+    const inputField = document.getElementById("searchPartNumber");
+    const dropdown = document.getElementById("dropdownList");
+    let selectedPartNumber = null;
+    let previousPartNumber = null;  // Track the previous part number to avoid unnecessary updates
 
-        function fetchLeakData(partNumber) {
-            if (!partNumber) return;
-            
-            fetch(`/leak-test/?part_number=${partNumber}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        console.warn(data.error);
-                        return;
-                    }
-                    updateFilterTable(data.latest_data);
-                })
-                .catch(error => console.error("Error fetching leak data:", error));
-        }
+    function fetchLeakData(partNumber) {
+        if (!partNumber) return;
 
-        function updateFilterTable(latestData) {
-            Object.keys(latestData).forEach(filterNo => {
-                document.getElementById(`filter_value_${filterNo}`).textContent = latestData[filterNo].leakage_value || "-";
-                document.getElementById(`highest_value_${filterNo}`).textContent = latestData[filterNo].highest_value || "-";
-                document.getElementById(`status_${filterNo}`).textContent = latestData[filterNo].status || "-";
-
-                let statusElement = document.getElementById(`status_${filterNo}`);
-
-                if (latestData[filterNo].status === "OK") {
-                    statusElement.style.color = "green";
-                    statusElement.style.fontWeight = "bold";
-                } else if (latestData[filterNo].status === "NOK") {
-                    statusElement.style.color = "red";
-                    statusElement.style.fontWeight = "bold";
-                } else {
-                    statusElement.style.color = "black";  // Default color
-                    statusElement.style.fontWeight = "normal";
+        fetch(`/leak-test/?part_number=${partNumber}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.warn(data.error);
+                    return;
                 }
+                updateFilterTable(data.latest_data);
+            })
+            .catch(error => console.error("Error fetching leak data:", error));
+    }
+
+    function updateFilterTable(latestData) {
+        Object.keys(latestData).forEach(filterNo => {
+            document.getElementById(`filter_value_${filterNo}`).textContent = latestData[filterNo].leakage_value || "-";
+            document.getElementById(`highest_value_${filterNo}`).textContent = latestData[filterNo].highest_value || "-";
+            document.getElementById(`status_${filterNo}`).textContent = latestData[filterNo].status || "-";
+
+            let statusElement = document.getElementById(`status_${filterNo}`);
+
+            if (latestData[filterNo].status === "OK") {
+                statusElement.style.color = "green";
+                statusElement.style.fontWeight = "bold";
+            } else if (latestData[filterNo].status === "NOK") {
+                statusElement.style.color = "red";
+                statusElement.style.fontWeight = "bold";
+            } else {
+                statusElement.style.color = "black";  // Default color
+                statusElement.style.fontWeight = "normal";
+            }
         });
+    }
+
+    // Show the dropdown when user types
+    inputField.addEventListener("input", function () {
+        let query = inputField.value.trim();
+        
+        if (query.length === 0) {
+            dropdown.style.display = "none";
+            return;
         }
 
-        function positionDropdown() {
-            const rect = inputField.getBoundingClientRect();
-            dropdown.style.position = "absolute";
-            dropdown.style.top = `${window.scrollY + rect.bottom}px`;
-            dropdown.style.left = `${window.scrollX + rect.left}px`;
-            dropdown.style.width = `${rect.width}px`;
-
-            // If the dropdown goes off the screen, position it above the input field
-            if (rect.bottom + dropdown.offsetHeight > window.innerHeight) {
-                dropdown.style.top = `${window.scrollY + rect.top - dropdown.offsetHeight}px`;
-            }
-        }
-
-        function startAutoRefresh() {
-            setInterval(function () {
-                if (selectedPartNumber) {
-                    fetchLeakData(selectedPartNumber);
+        fetch(`/search-part-numbers/?query=${query}`)
+            .then(response => response.json())
+            .then(data => {
+                dropdown.innerHTML = "";
+                if (data.results.length === 0) {
+                    dropdown.style.display = "none";
+                    return;
                 }
-            }, 3000);  // Fetch data every 3 seconds
-        }
 
-        inputField.addEventListener("input", function () {
-            let query = inputField.value.trim();
-            
-            if (query.length === 0) {
-                dropdown.style.display = "none";
-                return;
-            }
+                data.results.forEach(item => {
+                    let listItem = document.createElement("li");
+                    listItem.classList.add("dropdown-item");
+                    listItem.textContent = item.part_number;
+                    listItem.setAttribute("data-value", item.part_number);
 
-            fetch(`/search-part-numbers/?query=${query}`)
-                .then(response => response.json())
-                .then(data => {
-                    dropdown.innerHTML = "";
-                    if (data.results.length === 0) {
+                    listItem.addEventListener("click", function () {
+                        inputField.value = this.getAttribute("data-value");
                         dropdown.style.display = "none";
-                        return;
-                    }
+                        inputField.blur();
+                        selectedPartNumber = inputField.value;  // Store selected part number
 
-                    data.results.forEach(item => {
-                        let listItem = document.createElement("li");
-                        listItem.classList.add("dropdown-item");
-                        listItem.textContent = item.part_number;
-                        listItem.setAttribute("data-value", item.part_number);
-
-                        listItem.addEventListener("click", function () {
-                            inputField.value = this.getAttribute("data-value");
-                            dropdown.style.display = "none";
-                            inputField.blur();
-                            selectedPartNumber = inputField.value;  // Store selected part number
-                            fetchLeakData(selectedPartNumber);
-                        });
-
-                        dropdown.appendChild(listItem);
+                        // Only update if part number is different from previous selection
+                        if (selectedPartNumber !== previousPartNumber) {
+                            previousPartNumber = selectedPartNumber;  // Update previous part number
+                            fetchLeakData(selectedPartNumber);  // Fetch data for the new part number
+                            updateOrCreatePartLog(selectedPartNumber);  // Update or create the log entry
+                        }
                     });
 
-                    dropdown.style.display = "block";
-                    positionDropdown();  // Reposition dropdown dynamically
+                    dropdown.appendChild(listItem);
                 });
-        });
 
-        document.addEventListener("click", function (event) {
-            if (!inputField.contains(event.target) && !dropdown.contains(event.target)) {
-                dropdown.style.display = "none";
-            }
-        });
-
-        window.addEventListener("resize", positionDropdown); // Adjust on window resize
-        window.addEventListener("scroll", positionDropdown); // Adjust on window scroll
-
-        startAutoRefresh();
-    });
-</script>
-<script>
-document.getElementById("start_button").addEventListener("click", function () {
-    let selectedPartNumber = document.getElementById("searchPartNumber").value.trim();
-    if (!selectedPartNumber) {
-        alert("Please select a part number before starting.");
-        return;
-    }
-
-    let dataToSend = [];
-    
-    document.querySelectorAll("tbody tr").forEach(row => {
-        let filterNo = row.cells[0].textContent.trim();
-        let leakageValue = row.cells[1].textContent.trim();
-        let highestValue = row.cells[2].textContent.trim();
-        let statusText = row.cells[3].textContent.trim();
-
-        // Check if values are valid (i.e., not "-")
-        if (leakageValue !== "-" && highestValue !== "-" && statusText !== "-") {
-            dataToSend.push({
-                filter_no: filterNo,
-                leakage_value: parseFloat(leakageValue),
-                highest_value: parseFloat(highestValue),
-                status: statusText
+                dropdown.style.display = "block";
+                positionDropdown();  // Reposition dropdown dynamically
             });
+    });
+
+    document.addEventListener("click", function (event) {
+        if (!inputField.contains(event.target) && !dropdown.contains(event.target)) {
+            dropdown.style.display = "none";
         }
     });
 
-    if (dataToSend.length === 0) {
-        alert("No valid data found to store.");
-        return;
+    // Position dropdown dynamically
+    function positionDropdown() {
+        const rect = inputField.getBoundingClientRect();
+        dropdown.style.position = "absolute";
+        dropdown.style.top = `${window.scrollY + rect.bottom}px`;
+        dropdown.style.left = `${window.scrollX + rect.left}px`;
+        dropdown.style.width = `${rect.width}px`;
+
+        if (rect.bottom + dropdown.offsetHeight > window.innerHeight) {
+            dropdown.style.top = `${window.scrollY + rect.top - dropdown.offsetHeight}px`;
+        }
     }
 
-    fetch("/save-leak-test-data/", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": getCSRFToken(),  // Ensure CSRF token is included
-        },
-        body: JSON.stringify({
-            part_number: selectedPartNumber,
-            leak_data: dataToSend
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert("Data saved successfully!");
-        } else {
-            alert("Error saving data.");
+    // Handle FOI Start button click
+    document.getElementById("start_button").addEventListener("click", function () {
+        if (!selectedPartNumber) {
+            alert("Please select a part number before starting.");
+            return;
         }
-    })
-    .catch(error => console.error("Error:", error));
+        updateProdStatus(selectedPartNumber, 1);  // Start production status
+    });
+
+    // Handle FOI Stop button click
+    document.getElementById("stop_button").addEventListener("click", function () {
+        if (!selectedPartNumber) {
+            alert("Please select a part number before stopping.");
+            return;
+        }
+        updateProdStatus(selectedPartNumber, 0);  // Stop production status
+    });
+
+    // Function to update prodstatus based on button click (FOI Start or Stop)
+    function updateProdStatus(partNumber, status) {
+        fetch(`/update-prodstatus/`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCSRFToken(),
+            },
+            body: JSON.stringify({
+                part_number: partNumber,
+                prodstatus: status
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`ProdStatus updated to ${status === 1 ? 'Start' : 'Stop'} for part number: ${partNumber}`);
+            } else {
+                alert("Error updating ProdStatus.");
+            }
+        })
+        .catch(error => console.error("Error:", error));
+    }
+
+    // Function to update or create a record for the part_number (on selection)
+    function updateOrCreatePartLog(partNumber) {
+        fetch(`/update-part-log/`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCSRFToken(),
+            },
+            body: JSON.stringify({
+                part_number: partNumber
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                alert("Error updating or creating the part log.");
+            }
+        })
+        .catch(error => console.error("Error:", error));
+    }
+
+    // Function to get CSRF token
+    function getCSRFToken() {
+        return document.cookie.split("; ")
+            .find(row => row.startsWith("csrftoken="))
+            ?.split("=")[1];
+    }
 });
 
-// Function to get CSRF token
-function getCSRFToken() {
-    return document.cookie.split("; ")
-        .find(row => row.startsWith("csrftoken="))
-        ?.split("=")[1];
-}
 </script>
 {% endblock %}

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from import_export.admin import ImportExportModelAdmin
-from .models import User, LeakAppMasterData, FOI, LeakAppTest, Shift, LeakAppShowReport, LeakAppResult
+from .models import User, LeakAppMasterData, FOI, LeakAppTest, Shift, LeakAppShowReport, LeakAppResult, myplclog, YCalvalues
 from .resources import LeakAppMasterDataResource, LeakAppResultResource, LeakAppShowReportResource, LeakAppTestResource, FOIResource, ShiftResource
 
 
@@ -22,10 +22,10 @@ admin.site.register(LeakAppMasterData, LeakAppMasterDataAdmin)
 
 class FOIAdmin(ImportExportModelAdmin):
     resource_class = FOIResource
-    list_display = ('part_number', 'filter_counter', 'filterno', 'filter_values', 'date_field', 'iot_value', 'result', 'shift')
-    search_fields = ('filterno', 'result')
-    list_filter = ('result', 'shift')
-    ordering = ('-date_field',)
+    list_display = ('part_number', 'batch_counter', 'filter_no', 'filter_values', 'date', 'shift')
+    search_fields = ('filterno',)
+    list_filter = ('shift',)
+    ordering = ('-date',)
 
 admin.site.register(FOI, FOIAdmin)
 
@@ -58,16 +58,26 @@ class LeakAppShowReportAdmin(ImportExportModelAdmin):
 admin.site.register(LeakAppShowReport, LeakAppShowReportAdmin)
 
 
-class LeakAppResultAdmin(ImportExportModelAdmin):
-    resource_class = LeakAppResultResource
-    list_display = ('batch_counter', 'part_number', 'filter_no', 'filter_values', 'status', 'shift', 'date', 'filter_counter_by_system', 'iot_value')
-    search_fields = ('filter_no', 'status')
-    list_filter = ('status', 'shift')
-    ordering = ('-date',)
+# class LeakAppResultAdmin(ImportExportModelAdmin):
+#     resource_class = LeakAppResultResource
+#     list_display = ('batch_counter', 'part_number', 'filter_no', 'filter_values', 'status', 'shift', 'date', 'filter_counter_by_system', 'iot_value')
+#     search_fields = ('filter_no', 'status')
+#     list_filter = ('status', 'shift')
+#     ordering = ('-date',)
 
-admin.site.register(LeakAppResult, LeakAppResultAdmin)
+# admin.site.register(LeakAppResult, LeakAppResultAdmin)
+
+@admin.register(myplclog)
+class MyPLCLog(admin.ModelAdmin):
+    list_display = ['id', 'prodstatus']
+    list_filter = ['prodstatus']
+    search_fields = ['prodstatus']
+
+@admin.register(YCalvalues)
+class YCalvaluesAdmin(admin.ModelAdmin):
+    list_display = ["id", "filter_no", "c_value", "m_value"]
 
 # Customize Django Admin Branding
-admin.site.site_header = "Auto Leak Testing Reporting System"  # Header in the admin panel
-admin.site.site_title = "LeakApp Admin"  # Title on browser tab
-admin.site.index_title = "Welcome to Leak Reporting System"  # Dashboard title
+admin.site.site_header = "Auto Leak Testing Reporting System"
+admin.site.site_title = "LeakApp Admin"
+admin.site.index_title = "Welcome to Leak Reporting System"

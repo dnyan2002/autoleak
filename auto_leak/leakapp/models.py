@@ -32,13 +32,13 @@ class LeakAppMasterData(models.Model):
 
 class FOI(models.Model):
     part_number = models.ForeignKey(LeakAppMasterData, on_delete=models.CASCADE, verbose_name="Part Number")
-    filter_counter = models.IntegerField()
-    filterno = models.CharField(max_length=255)
+    batch_counter = models.IntegerField()
+    filter_no = models.CharField(max_length=255)
     filter_values = models.FloatField()
-    date_field = models.DateField()
-    iot_value = models.IntegerField()
-    result = models.CharField(max_length=25)
-    shift = models.CharField(max_length=25)
+    date = models.DateField()
+    # iot_value = models.IntegerField()
+    # result = models.CharField(max_length=25)
+    shift = models.CharField(max_length=25, null=True, blank=True)
 
     # def __str__(self):
     #     return f"{self.PartNumber} - {self.FilterNo} ({self.Date_Field})"
@@ -113,13 +113,45 @@ class LeakAppResult(models.Model):
     part_number = models.ForeignKey(LeakAppMasterData, on_delete=models.CASCADE)
     filter_no = models.CharField(max_length=50)
     filter_values = models.FloatField()
-    status = models.CharField(max_length=30)
-    shift = models.ForeignKey(Shift, on_delete=models.CASCADE)
+    # status = models.CharField(max_length=30)
+    shift = models.ForeignKey(Shift, on_delete=models.CASCADE, null=True, blank=True)
     date = models.DateTimeField(auto_now=True)
-    filter_counter_by_system = models.IntegerField()
-    iot_value = models.IntegerField(null=True, blank=True)
+    # filter_counter_by_system = models.IntegerField()
+    # iot_value = models.IntegerField(null=True, blank=True)
+    processed = models.BooleanField(default=False)
 
     class Meta:
         db_table = "leakapp_result_tbl"
         verbose_name = "Leak Result"
         verbose_name_plural = "Leak Results"
+
+
+class myplclog(models.Model):
+    prodstatus = models.IntegerField()
+    part_number = models.ForeignKey(LeakAppMasterData, on_delete=models.CASCADE)
+    server_connection_1 = models.IntegerField(null=True, blank=True)
+    server_connection_2 = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "myplclog"
+
+class YCalvalues(models.Model):
+    filter_no = models.CharField(max_length=25, unique=True)
+    c_value = models.FloatField()
+    m_value = models.FloatField()
+
+    class Meta:
+        db_table = "y_cal_values"
+
+class FOIHighest(models.Model):
+    part_number = models.ForeignKey(LeakAppMasterData, on_delete=models.CASCADE)
+    batch_counter = models.IntegerField(null=True, blank=True)
+    filter_values = models.FloatField()
+    filter_no = models.CharField(max_length=50, verbose_name="Filter No")
+    status = models.CharField(max_length=30, default="NOK")
+    shift = models.ForeignKey(Shift, on_delete=models.CASCADE, null=True, blank=True)
+    highest_value = models.FloatField()
+    date = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "foihighest"
