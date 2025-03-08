@@ -77,20 +77,48 @@ def leak_test_page(request):
     part_number = request.GET.get('part_number', '').strip()
     filter_numbers = [f'AI{i}' for i in range(1, 17)]  # AI1 to AI16 (Fixed)
 
-    # Default empty data
+    # Default empty data for all filters
     latest_data = {filter_no: {"leakage_value": "-", "highest_value": "-", "status": "-"} for filter_no in filter_numbers}
 
     if part_number:
-        query = LeakAppTest.objects.filter(part_number__part_number=part_number)
-        latest_records = query.values('filter_no').annotate(latest_date=Max('date'))
+        # Raw SQL query to get the latest leakage value from LeakAppResultTbl and other data from LeakAppTest
+        query = """
+            SELECT
+                lat.filter_no,
+                lat.highest_value,
+                lat.status,
+                lar.filter_values AS leakage_value
+            FROM
+                leakapp_test lat
+            LEFT JOIN leakapp_result_tbl lar
+                ON lat.filter_no = lar.filter_no
+            WHERE
+                lat.part_number_id = %s
+            AND lar.date = (
+                SELECT MAX(date)
+                FROM leakapp_result_tbl
+                WHERE filter_no = lar.filter_no
+            )
+            AND lat.date = (
+                SELECT MAX(date)
+                FROM leakapp_test
+                WHERE filter_no = lat.filter_no
+            )
+        """
 
-        for record in latest_records:
-            latest_entry = query.filter(filter_no=record['filter_no'], date=record['latest_date']).first()
-            if latest_entry and record['filter_no'] in latest_data:
-                latest_data[record['filter_no']] = {
-                    "leakage_value": latest_entry.filter_values or "-",
-                    "highest_value": latest_entry.highest_value or "-",
-                    "status": latest_entry.status or "-"
+        # Execute the query
+        with connection.cursor() as cursor:
+            cursor.execute(query, [part_number])  # Pass part_number as a parameter to prevent SQL injection
+            rows = cursor.fetchall()
+
+        # Process the fetched data and populate `latest_data`
+        for row in rows:
+            filter_no, highest_value, status, leakage_value = row
+            if filter_no in latest_data:
+                latest_data[filter_no] = {
+                    "leakage_value": leakage_value or "-",
+                    "highest_value": highest_value or "-",
+                    "status": status or "-"
                 }
 
     # Check if request is Ajax to send back JSON response
@@ -99,10 +127,9 @@ def leak_test_page(request):
     
     # For the initial load of the page
     return render(request, 'leak_test.html', {
-        "latest_data": latest_data, 
+        "latest_data": latest_data,
         "filter_names": filter_numbers
     })
-
 
 @login_required(login_url="login")
 def leak_test_view(request):
@@ -114,19 +141,27 @@ def leak_test_view(request):
     latest_data = {filter_no: {"leakage_value": "-", "highest_value": "-", "status": "-"} for filter_no in filter_numbers}
 
     if part_number:
+        # Fetch the latest records from LeakAppTest for the selected part_number
         query = LeakAppTest.objects.filter(part_number__part_number=part_number)
         latest_records = query.values('filter_no').annotate(latest_date=Max('date'))
 
         for record in latest_records:
+            # Fetch the corresponding latest entry from LeakAppTest
             latest_entry = query.filter(filter_no=record['filter_no'], date=record['latest_date']).first()
-            if latest_entry and record['filter_no'] in latest_data:
+
+            # Fetch the latest leakage_value from LeakAppResultTbl
+            leakage_value_entry = LeakAppResult.objects.filter(filter_no=record['filter_no']).latest('date')
+            print(leakage_value_entry.filter_no)
+            if latest_entry and leakage_value_entry and record['filter_no'] in latest_data:
                 latest_data[record['filter_no']] = {
-                    "leakage_value": latest_entry.filter_values or "-",
+                    "leakage_value": leakage_value_entry.filter_values or "-",
                     "highest_value": latest_entry.highest_value or "-",
                     "status": latest_entry.status or "-"
                 }
 
+    # Return JSON response with the latest data
     return JsonResponse({"latest_data": latest_data}, safe=False)
+
 
 @login_required(login_url="login")
 def search_part_numbers_for_leak_test(request):
@@ -348,17 +383,22 @@ def update_part_log(request):
 
     return JsonResponse({"success": False, "error": "Invalid request method."}, status=400)
 
+@login_required(login_url="login")
 def get_server_status(request):
     try:
-        log_entry = myplclog.objects.first()  # Fetch the only record in the table
-        print(log_entry)
-        if not log_entry:
-            return JsonResponse({"error": "No log data available"}, status=404)
-
-        server_status = {
-            "server_connection_1": log_entry.server_connection_1,
-            "server_connection_2": log_entry.server_connection_2,
-        }
-        return JsonResponse(server_status)
+        # Using raw SQL for better performance
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT server_connection_1, server_connection_2 FROM myplclog LIMIT 1;")
+            row = cursor.fetchone()
+            
+            if not row:
+                return JsonResponse({"error": "No log data available"}, status=404)
+            
+            server_status = {
+                "server_connection_1": row[0],  # first column
+                "server_connection_2": row[1],  # second column
+            }
+            return JsonResponse(server_status)
+    
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

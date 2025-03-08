@@ -112,7 +112,7 @@
   </div>
 </div>
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
+   document.addEventListener("DOMContentLoaded", function () {
     const inputField = document.getElementById("searchPartNumber");
     const dropdown = document.getElementById("dropdownList");
     let selectedPartNumber = null;
@@ -288,41 +288,58 @@
             .find(row => row.startsWith("csrftoken="))
             ?.split("=")[1];
     }
+
+    // Fetch data every 1 second after selecting a part number
+    setInterval(() => {
+        if (selectedPartNumber) {
+            fetchLeakData(selectedPartNumber);
+        }
+    }, 1000);  // Fetch every 1 second
+
+    // Fetch server status at regular intervals
+    let fetching = false;
+
+    async function fetchServerStatus() {
+        if (fetching) return;  // Avoid making a new request if the current one is still in progress.
+        
+        fetching = true;
+        try {
+            const response = await fetch("/get-server-status/");  // URL must match Django view's URL pattern
+            const data = await response.json();
+
+            if (data.error) {
+                console.warn("Server status fetch error:", data.error);
+                return;
+            }
+
+            updateServerUI("server_1_status", data.server_connection_1);
+            updateServerUI("server_2_status", data.server_connection_2);
+        } catch (error) {
+            console.error("Error fetching server status:", error);
+        } finally {
+            fetching = false;  // Allow the next fetch request after this one completes
+        }
+    }
+
+    function updateServerUI(elementId, status) {
+        let element = document.getElementById(elementId);
+        if (element) {
+            if (status === 1) {
+                element.textContent = "Running";
+                element.style.color = "green";
+                element.style.fontWeight = "bold";
+            } else {
+                element.textContent = "Stopped";
+                element.style.color = "red";
+                element.style.fontWeight = "bold";
+            }
+        }
+    }
+
+    fetchServerStatus();
+
+    setInterval(fetchServerStatus, 2000);  // Wait 2 seconds before fetching the server status again
 });
-// document.addEventListener("DOMContentLoaded", function () {
-//     function fetchServerStatus() {
-//         fetch("/get-server-status/")  // URL must match Django view's URL pattern
-//             .then(response => response.json())
-//             .then(data => {
-//                 if (data.error) {
-//                     console.warn("Server status fetch error:", data.error);
-//                     return;
-//                 }
-
-//                 updateServerUI("server_1_status", data.server_connection_1);
-//                 updateServerUI("server_2_status", data.server_connection_2);
-//             })
-//             .catch(error => console.error("Error fetching server status:", error));
-//     }
-
-//     function updateServerUI(elementId, status) {
-//         let element = document.getElementById(elementId);
-//         if (element) {
-//             if (status === 1) {
-//                 element.textContent = "Running";
-//                 element.style.color = "green";
-//                 element.style.fontWeight = "bold";
-//             } else {
-//                 element.textContent = "Stopped";
-//                 element.style.color = "red";
-//                 element.style.fontWeight = "bold";
-//             }
-//         }
-//     }
-//     fetchServerStatus();
-
-//     setInterval(fetchServerStatus, 5);
-// });
 
 </script>
 {% endblock %}
