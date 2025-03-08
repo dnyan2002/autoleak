@@ -42,20 +42,37 @@ class DatabaseCommunication:
             logging.warning("❌ No database connection. Attempting to reconnect...")
             self.connect_db()
 
-    def fetch_unprocessed_values(self, filter_no):
+    def fetch_filtered_values(self, filter_no, timer_duration):
+        """
+        Fetch values from leakapp_result_tbl within the given timer duration.
+        """
         try:
             self.check_connection()
+            time_threshold = datetime.now() - timedelta(seconds=timer_duration)
+            
             query = """
-                SELECT id, part_number_id, batch_counter, filter_no, filter_values, shift_id, date 
-                FROM leakapp_result_tbl
-                WHERE filter_no = %s AND processed = 0
-                ORDER BY date DESC 
-                LIMIT 150
+                SELECT filter_values 
+                FROM leakapp_result_tbl 
+                WHERE filter_no = %s AND date >= %s
             """
-            self.cursor.execute(query, (filter_no,))
-            return self.cursor.fetchall()
+            self.cursor.execute(query, (filter_no, time_threshold))
+            results = self.cursor.fetchall()
+            
+            # Extract values
+            all_values = []
+            for row in results:
+                try:
+                    values = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                    if isinstance(values, (int, float)):  
+                        values = [values]  
+                    if isinstance(values, list):
+                        all_values.extend(values)
+                except json.JSONDecodeError:
+                    logging.error(f"❌ Error parsing filter values for {filter_no}: {row[0]}")
+
+            return all_values
         except Error as e:
-            logging.error(f"❌ Error fetching unprocessed values for {filter_no}: {e}")
+            logging.error(f"❌ Error fetching filtered values for {filter_no}: {e}")
             return []
 
     def fetch_shift_id(self):
@@ -114,57 +131,68 @@ class DatabaseCommunication:
         except Error as e:
             logging.error(f"❌ Error inserting into leakapp_test: {e}")
 
+    def insert_into_leakapp_showreport(self, filter_no, highest_value, status, shift_id, part_number_id):
+        """
+        Insert the highest value found into leakapp_showreport with a foreign key.
+        """
+        try:
+            self.check_connection()
+            query = """
+                INSERT INTO leakapp_show_report (filter_no, highest_value, status, shift_id, part_number_id, date)
+                VALUES (%s, %s, %s, %s, %s, NOW())
+            """
+            self.cursor.execute(query, (filter_no, highest_value, status, shift_id, part_number_id))
+            logging.info(f"✅ Inserted into leakapp_showreport: Filter {filter_no}, Max: {highest_value}, Status: {status}, Part No: {part_number_id}")
+        except Error as e:
+            logging.error(f"❌ Error inserting into leakapp_showreport: {e}")
+                                                                       
     def process_filters(self):
         filters = [f"AI{i}" for i in range(1, 17)]
 
         while True:
             for filter_no in filters:
-                results = self.fetch_unprocessed_values(filter_no)
-                if not results:
-                    logging.info(f"✅ No unprocessed results found for filter {filter_no}")
-                    continue
-
                 shift_id = self.fetch_shift_id()
                 if shift_id is None:
                     logging.error("❌ Could not determine shift. Skipping processing.")
                     continue
 
-                # Ensure shift_id exists in shift_tbl
-                self.cursor.execute("SELECT COUNT(*) FROM shift_tbl WHERE id = %s", (shift_id,))
-                if self.cursor.fetchone()[0] == 0:
-                    logging.error(f"❌ Invalid shift_id {shift_id}: It does not exist in shift_tbl.")
+                # Fetch master data for timer and setpoints
+                part_number_id = 10
+                master_data = self.fetch_master_data(part_number_id)
+                if not master_data:
+                    logging.warning(f"❌ No master data found for part_number_id: {part_number_id}")
                     continue
 
+                timer1, timer2, setpoint1, setpoint2 = master_data
+                timer1 = timer1 / 1000000 if timer1 > 10000 else timer1
+                timer2 = timer2 / 1000000 if timer2 > 10000 else timer2
 
-                for result in results:
-                    result_id, part_number_id, batch_counter, filter_no, filter_values, shift, date = result
+                # Fetch values within the timer intervals
+                values_timer1 = self.fetch_filtered_values(filter_no, timer1)
+                values_timer2 = self.fetch_filtered_values(filter_no, timer2)
 
-                    try:
-                        if isinstance(filter_values, (int, float)):  # If it's a single number, convert to a list
-                            filter_values = [filter_values]
-                        else:
-                            filter_values = json.loads(filter_values)  # Parse JSON if it's a string
+                if not values_timer1 and not values_timer2:
+                    logging.info(f"✅ No values found for filter {filter_no} in last {timer2} seconds")
+                    continue
 
-                        if not isinstance(filter_values, list):  # Ensure it's a list
-                            raise ValueError("filter_values should be a list")
-                    except Exception as e:
-                        logging.error(f"❌ Invalid filter_values format for result ID {result_id}: {e} (Value: {filter_values})")
-                        continue
+                # Get highest value in timer1 & timer2 intervals
+                max_value_timer1 = max(values_timer1) if values_timer1 else 0
+                max_value_timer2 = max(values_timer2) if values_timer2 else 0
 
-                    master_data = self.fetch_master_data(part_number_id)
-                    if not master_data:
-                        logging.warning(f"❌ No master data found for part_number_id: {part_number_id}")
-                        continue
+                status_timer1 = "OK" if max_value_timer1 <= setpoint1 else "NOK"
+                status_timer2 = "OK" if max_value_timer2 <= setpoint2 else "NOK"
+                
+                query = "SELECT id FROM leakapp_result_tbl WHERE filter_no = %s ORDER BY date DESC LIMIT 1"
+                self.cursor.execute(query, (filter_no,))
+                result = self.cursor.fetchone()
+                result_id = result[0] if result else None
+                print(result_id)
 
-                    timer1, timer2, setpoint1, setpoint2 = master_data
-                    highest_value = max(max(filter_values), setpoint1, setpoint2)
-                    status = "OK" if highest_value <= setpoint1 else "NOK"
-
-                    self.update_result_status(result_id)
-                    self.insert_into_leakapp_test(part_number_id, filter_no, highest_value, status, shift_id)
+                if result_id:
+                    self.insert_into_leakapp_test(part_number_id, filter_no, max_value_timer1, status_timer1, shift_id)
+                    self.insert_into_leakapp_showreport(filter_no, max_value_timer2, status_timer2, shift_id, part_number_id)
 
             time.sleep(5)
-
 
 if __name__ == "__main__":
     db = DatabaseCommunication()

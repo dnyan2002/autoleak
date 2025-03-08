@@ -36,7 +36,17 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2 class="mb-3">Leak Test</h2>
+    <div class="row mb-3 d-flex justify-content-between">
+        <div class="col-auto">
+            <h2 class="mb-3">Leak Test</h2>
+        </div>
+        <div class="col-auto">
+            <h5>IOT 1: <span id="server_1_status" style="font-weight:bold; color:gray;">Loading...</span></h5>
+            <h5>IOT 2: <span id="server_2_status" style="font-weight:bold; color:gray;">Loading...</span></h5>
+        </div>
+    </div>
+</div>
+
 
     <!-- Part Selection Input -->
     <div class="d-flex align-items-center justify-content-between mb-3">
@@ -279,6 +289,40 @@
             ?.split("=")[1];
     }
 });
+// document.addEventListener("DOMContentLoaded", function () {
+//     function fetchServerStatus() {
+//         fetch("/get-server-status/")  // URL must match Django view's URL pattern
+//             .then(response => response.json())
+//             .then(data => {
+//                 if (data.error) {
+//                     console.warn("Server status fetch error:", data.error);
+//                     return;
+//                 }
+
+//                 updateServerUI("server_1_status", data.server_connection_1);
+//                 updateServerUI("server_2_status", data.server_connection_2);
+//             })
+//             .catch(error => console.error("Error fetching server status:", error));
+//     }
+
+//     function updateServerUI(elementId, status) {
+//         let element = document.getElementById(elementId);
+//         if (element) {
+//             if (status === 1) {
+//                 element.textContent = "Running";
+//                 element.style.color = "green";
+//                 element.style.fontWeight = "bold";
+//             } else {
+//                 element.textContent = "Stopped";
+//                 element.style.color = "red";
+//                 element.style.fontWeight = "bold";
+//             }
+//         }
+//     }
+//     fetchServerStatus();
+
+//     setInterval(fetchServerStatus, 5);
+// });
 
 </script>
 {% endblock %}

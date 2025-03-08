@@ -81,7 +81,6 @@ def leak_test_page(request):
     latest_data = {filter_no: {"leakage_value": "-", "highest_value": "-", "status": "-"} for filter_no in filter_numbers}
 
     if part_number:
-        
         query = LeakAppTest.objects.filter(part_number__part_number=part_number)
         latest_records = query.values('filter_no').annotate(latest_date=Max('date'))
 
@@ -94,13 +93,16 @@ def leak_test_page(request):
                     "status": latest_entry.status or "-"
                 }
 
+    # Check if request is Ajax to send back JSON response
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({"latest_data": latest_data}, safe=False)
     
+    # For the initial load of the page
     return render(request, 'leak_test.html', {
         "latest_data": latest_data, 
         "filter_names": filter_numbers
     })
+
 
 @login_required(login_url="login")
 def leak_test_view(request):
@@ -345,3 +347,18 @@ def update_part_log(request):
         return JsonResponse({"success": True})
 
     return JsonResponse({"success": False, "error": "Invalid request method."}, status=400)
+
+def get_server_status(request):
+    try:
+        log_entry = myplclog.objects.first()  # Fetch the only record in the table
+        print(log_entry)
+        if not log_entry:
+            return JsonResponse({"error": "No log data available"}, status=404)
+
+        server_status = {
+            "server_connection_1": log_entry.server_connection_1,
+            "server_connection_2": log_entry.server_connection_2,
+        }
+        return JsonResponse(server_status)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

@@ -168,7 +168,6 @@ class DatabaseCommunication:
             headers = {"Content-Type": "application/json"}
             response = requests.post(url, data=json.dumps(post_data), headers=headers)
 
-            # Log the response for debugging
             if response.status_code == 200:
                 logging.info("✅ Data successfully posted to the external service.")
                 print("Response from httpbin:", response.json())  # Print the response data
