@@ -151,7 +151,6 @@ def leak_test_view(request):
 
             # Fetch the latest leakage_value from LeakAppResultTbl
             leakage_value_entry = LeakAppResult.objects.filter(filter_no=record['filter_no']).latest('date')
-            print(leakage_value_entry.filter_no)
             if latest_entry and leakage_value_entry and record['filter_no'] in latest_data:
                 latest_data[record['filter_no']] = {
                     "leakage_value": leakage_value_entry.filter_values or "-",

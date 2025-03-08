@@ -110,15 +110,33 @@ class DatabaseCommunication:
                 INSERT INTO foihighest (part_number_id, batch_counter, filter_no, filter_values, highest_value, status, date)
                 VALUES (%s, %s, %s, %s, %s, %s, NOW())
             """
+            # Prepare the query to update leakapp_test
+            leakapp_test_query = """
+                INSERT INTO leakapp_test (part_number_id, batch_counter, filter_no, filter_values, highest_value, status, date)
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                ON DUPLICATE KEY UPDATE
+                    filter_values = VALUES(filter_values),
+                    highest_value = VALUES(highest_value),
+                    status = VALUES(status),
+                    batch_counter = VALUES(batch_counter),
+                    date = NOW()
+            """
 
+            # Loop through all AI filters (AI1 to AI16)
+            for i in range(1, 17):
+                current_filter_no = f"AI{i}"
             # Prepare the data to insert
-            data = (part_number_id, batch_counter, filter_no, filter_values, highest_value, "Not Ok")
+            data = (part_number_id, batch_counter, filter_no, filter_values, highest_value, "NOK")
             self.cursor.execute(query, data)
+            self.cursor.execute(leakapp_test_query, data)
+            logging.info(f"✅ Data updated/inserted into leakapp_test for {current_filter_no}: {data}")
             self.connection.commit()
             logging.info(f"✅ Data inserted into foihighest_tbl: {data}")
 
         except Error as e:
-            logging.error(f"❌ Error inserting data into foihighest_tbl: {e}")
+            logging.error(f"❌ Error inserting/updating data in foihighest_tbl or leakapp_test: {e}")
+            if self.connection and self.connection.is_connected():
+                self.connection.rollback()  # Rollback in case of error
             self.reconnect()
 
     def fetch_max_filter_values(self):
