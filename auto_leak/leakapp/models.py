@@ -91,6 +91,8 @@ class LeakAppTest(models.Model):
         verbose_name = "Leak Test"
         verbose_name_plural = "Leak Tests"
 
+    def __str__(self):
+        return self.part_number
 
 class LeakAppShowReport(models.Model):
     batch_counter = models.IntegerField()

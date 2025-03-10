@@ -10,6 +10,8 @@ from django.views import View
 from django.db import connection
 from django.contrib.auth.decorators import login_required
 from datetime import datetime
+import matplotlib
+matplotlib.use('agg')
 from matplotlib import pyplot as plt
 from django.http import JsonResponse
 from django.db.models import Max
@@ -186,6 +188,7 @@ def report_screen(request):
     selected_month = request.GET.get("month", "")
     selected_year = request.GET.get("year", "")
     selected_part_number = request.GET.get("part_number", "")
+    print(selected_part_number)
     selected_status = request.GET.get("status", "")
     selected_shift = request.GET.get("shift", "")
 
@@ -225,8 +228,10 @@ def report_screen(request):
         except Shift.DoesNotExist:
             sql_query += " AND 1=0"
     if selected_part_number:
+        print("part Selected")
         try:
             part = LeakAppMasterData.objects.get(id=selected_part_number)
+            print(part)
             with connection.cursor() as cursor:
                 cursor.execute("SHOW COLUMNS FROM leakapp_show_report LIKE 'part_number_id'")
                 is_foreign_key = bool(cursor.fetchone())
@@ -235,7 +240,7 @@ def report_screen(request):
                 sql_query += " AND part_number_id = %s"
                 sql_params.append(part.id)
             else:
-                sql_query += " AND part_number = %s"
+                sql_query += " AND part_number_id = %s"
                 sql_params.append(part.part_number)
         except LeakAppMasterData.DoesNotExist:
             sql_query += " AND 1=0"

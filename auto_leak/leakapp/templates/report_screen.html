@@ -381,7 +381,7 @@ body {
                 <select id="part_number" name="part_number">
                     <option value="">Select Part Number</option>
                     {% for part in part_numbers %}
-                        <option value="{{ part_number.id }}" {% if part_number.id|stringformat:"s" == selected_part_number %} selected {% endif %}>
+                        <option value="{{ part.id }}" {% if part.id|stringformat:"s" == selected_part_number %} selected {% endif %}>
                             {{ part.part_number }}
                         </option>
                     {% endfor %}
@@ -470,29 +470,6 @@ body {
 
             </tbody>
         </table>
-    </div>
-</div>
-<!-- Footer Contact Button -->
-<div class="footer" onclick="openContactModal()">
-    <p>Contact</p>
-</div>
-
-<!-- Modal Structure -->
-<div id="contactModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeContactModal()">×</span>
-        <img src="{% static 'images/mainlogo.jpg' %}" alt="Logo" class="modal-logo">
-        <br>
-        <div class="modal-details">
-            <p><strong>Sandeep Bhadkamkar</strong></p>
-            <p><i class="fas fa-phone"></i> 9890033285</p>
-            <p><i class="fas fa-globe"></i> 
-                <a href="http://www.automationteknix.com" target="_blank">www.automationteknix.com</a>
-            </p>
-            <p><i class="fas fa-envelope"></i> 
-                <a href="mailto:sandeep@automationteknix.com">sandeep@automationteknix.com</a>
-            </p>
-        </div>
     </div>
 </div>
     <!-- jQuery script -->
@@ -798,5 +775,4 @@ $('#filterButton').on('click', function () {
     });
 </script>
 </body>
-
 </html>
