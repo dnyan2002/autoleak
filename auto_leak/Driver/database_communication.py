@@ -58,20 +58,14 @@ def with_connection(func):
                 retry_count += 1
                 if retry_count >= max_retries:
                     logging.error(f"❌ Max retries reached in {func.__name__} after general error")
-                    return None  # Or appropriate default value
-                
-                time.sleep(1)  # Wait before retry
-        
-        # This point should not be reached due to returns in the loop,
-        # but just in case, return an appropriate default
+                    return None
+                time.sleep(5)
         return None
     
     return wrapper
 
 class DatabaseCommunication:
-    # Thread-local storage for connections
     _thread_local = threading.local()
-    # Lock for connection pool access
     _pool_lock = threading.Lock()
     
     def __init__(self):
@@ -85,6 +79,8 @@ class DatabaseCommunication:
         self.connection = None
         self.cursor = None
         self.cnxpool = None
+        self.last_used = time.time()
+        self.max_idle_time = 60
         
         # Try to create a connection pool but have fallback mechanism
         try:
@@ -92,7 +88,7 @@ class DatabaseCommunication:
                 self.cnxpool = mysql.connector.pooling.MySQLConnectionPool(
                     pool_name="leak_detection_pool",
                     pool_size=32,  # Maintain pool size of 32
-                    pool_reset_session=True,  # Reset session when returned to pool
+                    pool_reset_session=True,
                     **self.db_config
                 )
             logging.info("✅ Database connection pool created successfully!")
@@ -105,6 +101,7 @@ class DatabaseCommunication:
 
     def connect_db(self):
         """Connects to the database and initializes the cursor."""
+        
         try:
             if hasattr(self, 'cnxpool') and self.cnxpool:
                 with self._pool_lock:
@@ -127,7 +124,7 @@ class DatabaseCommunication:
         logging.info("🔄 Attempting to reconnect to the database...")
         try:
             self.close_connection()
-            time.sleep(0.2)  # Brief pause before reconnection attempt
+            time.sleep(0.1)  # Brief pause before reconnection attempt
             self.connect_db()
         except Exception as e:
             logging.error(f"❌ Error during reconnection: {e}", exc_info=True)
@@ -164,15 +161,21 @@ class DatabaseCommunication:
             raise e
 
     def ping_connection(self):
-        """Ping the MySQL server to keep the connection alive"""
+        """Ping the database to keep the connection alive."""
         try:
-            if self.connection:
-                self.connection.ping(reconnect=True, attempts=3, delay=1)
-                return True
-        except mysql.connector.Error as err:
-            logging.error(f"❌ Database ping failed: {err}")
-            self.reconnect()
-            return False
+            self.ensure_connection()
+            logging.debug("✅ Database connection ping successful")
+        except Exception as e:
+            logging.error(f"❌ Database ping failed: {e}")
+    
+    def close_connection(self):
+        """Close the database connection."""
+        if self.connection:
+            try:
+                self.connection.close()
+                logging.info("✅ Database connection closed")
+            except Exception as e:
+                logging.error(f"❌ Error closing database connection: {e}")
 
     @with_connection
     def update_server_connection(self, device_id, status):
@@ -202,11 +205,27 @@ class DatabaseCommunication:
             if self.connection and self.connection.is_connected():
                 self.connection.rollback()
             return False
+    def ensure_connection(self):
+        """Ensure the database connection is valid before operations."""
+        try:
+            # Check if connection is too old (idle for too long)
+            if time.time() - self.last_used > self.max_idle_time:
+                logging.info("🔄 Connection idle for too long, refreshing...")
+                self.connect_db()
+                return
+            
+            # Check if connection is still valid with a simple query
+            self.cursor.execute("SELECT 1")
+            self.connection.commit()
+            self.last_used = time.time()
+        except Exception as e:
+            logging.warning(f"⚠️ Database connection check failed: {e}")
+            self.connect_db()
 
     @with_connection
     def insert_data_batch(self, json_data):
         """Inserts sensor data into the appropriate table based on prodstatus."""
-        # Get current prodstatus and part_number_id
+        self.ensure_connection()
         prodstatus, part_number_id = self.get_prodstatus_and_part_number_id()
         if prodstatus is None or part_number_id is None:
             logging.error("❌ Failed to retrieve prodstatus or part_number_id, data will not be inserted.")
@@ -494,42 +513,6 @@ class DatabaseCommunication:
                 logging.info(f"✅ Created new filter in leakapp_test: {filter_no} with ID {test_id}")
         
         return True
-
-    def close_connection(self):
-        """Closes the database connection properly."""
-        try:
-            if self.cursor:
-                self.cursor.close()
-                self.cursor = None
-                
-            if self.connection:
-                if self.connection.in_transaction:
-                    try:
-                        # Roll back any incomplete transactions
-                        self.connection.rollback()
-                        logging.info("Rolled back incomplete transaction during connection close")
-                    except:
-                        pass
-                        
-                if hasattr(self, 'cnxpool') and self.cnxpool:
-                    try:
-                        # Return connection to pool instead of closing
-                        self.connection.reset_session()  # Clear session state before returning
-                        self.cnxpool.add_connection(self.connection)
-                    except mysql.connector.errors.PoolError:
-                        # If pool is full, just close the connection
-                        self.connection.close()
-                        logging.warning("⚠️ Connection pool is full, connection was closed instead of returned to pool")
-                else:
-                    self.connection.close()
-                    
-                self.connection = None
-                logging.info("✅ Database connection closed.")
-        except Exception as e:
-            logging.error(f"❌ Error while closing database connection: {e}", exc_info=True)
-            # Ensure connection and cursor are nullified even if there's an error
-            self.connection = None
-            self.cursor = None
             
     def __del__(self):
         """Destructor to ensure connections are closed."""

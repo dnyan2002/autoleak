@@ -152,7 +152,12 @@ def leak_test_view(request):
             latest_entry = query.filter(filter_no=record['filter_no'], date=record['latest_date']).first()
 
             # Fetch the latest leakage_value from LeakAppResultTbl
-            leakage_value_entry = LeakAppResult.objects.filter(filter_no=record['filter_no']).latest('date')
+            myplcprodstatus = myplclog.objects.get(id=1)
+            if myplcprodstatus.prodstatus == 1:
+                leakage_value_entry = FOI.objects.filter(filter_no=record['filter_no']).latest('date')
+            else:
+                leakage_value_entry = LeakAppResult.objects.filter(filter_no=record['filter_no']).latest('date')
+
             if latest_entry and leakage_value_entry and record['filter_no'] in latest_data:
                 latest_data[record['filter_no']] = {
                     "leakage_value": leakage_value_entry.filter_values or "-",
